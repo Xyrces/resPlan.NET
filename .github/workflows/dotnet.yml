@@ -56,6 +56,12 @@ jobs:
     - name: Test
       run: dotnet test --no-build --verbosity normal
 
+    - name: Pack
+      run: dotnet pack ResPlan.Library/ResPlan.Library.csproj --no-build --output nupkgs
+
+    - name: Publish to GitHub Packages
+      run: dotnet nuget push nupkgs/*.nupkg --source https://nuget.pkg.github.com/ResPlan/index.json --api-key ${{ secrets.GITHUB_TOKEN }} --skip-duplicate
+
     # Upload Comparison Artifacts
     - name: Upload Image Artifacts
       if: always()
