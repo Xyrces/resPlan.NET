@@ -1,25 +1,20 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using ResPlan.Library;
 
 namespace ResPlan.Demo
 {
     class Program
     {
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
             Console.WriteLine("ResPlan.NET Demo");
 
-            string jsonPath = "resplan_samples.json";
-            if (!File.Exists(jsonPath))
-            {
-                Console.WriteLine($"Error: {jsonPath} not found. Run python script first.");
-                return;
-            }
-
             Console.WriteLine("Loading plans...");
-            var plans = PlanLoader.LoadPlans(jsonPath);
+            // Pass null to trigger Python loading path, limit to 50 for demo speed
+            var plans = await PlanLoader.LoadPlansAsync(null, maxItems: 50);
             Console.WriteLine($"Loaded {plans.Count} plans.");
 
             foreach (var plan in plans)
