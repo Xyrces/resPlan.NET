@@ -1,0 +1,67 @@
+name: .NET
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    # Python setup for generating reference data
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install networkx shapely geopandas matplotlib opencv-python
+
+    - name: Clone ResPlan Data
+      run: |
+        git clone https://github.com/m-agour/ResPlan.git
+        unzip ResPlan/ResPlan.zip -d ResPlan
+
+    - name: Generate Reference Data & Images
+      run: python inspect_and_export.py
+
+    - name: Move Reference Data for Tests
+      run: |
+        mkdir -p ResPlan.Tests/ReferenceImages
+        cp reference_images/*.png ResPlan.Tests/ReferenceImages/
+        cp resplan_samples.json ResPlan.Tests/resplan_samples.json
+        # Also needed for Demo execution if run
+        cp resplan_samples.json ResPlan.Demo/resplan_samples.json
+
+    # .NET Setup
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 9.0.x
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build
+      run: dotnet build --no-restore
+
+    - name: Test
+      run: dotnet test --no-build --verbosity normal
+
+    # Upload Comparison Artifacts
+    - name: Upload Image Artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: comparison-images
+        path: |
+          ResPlan.Tests/ReferenceImages/*.png
+          ResPlan.Tests/bin/Debug/net9.0/actual_plan_*.png
