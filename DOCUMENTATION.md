@@ -8,7 +8,7 @@ ResPlan.NET bridges .NET and Python to leverage the specific data format of the 
 
 ```mermaid
 graph TD
-    subgraph "ResPlan.Library (.NET)"
+    subgraph DotNet ["ResPlan.Library (.NET)"]
         PL[PlanLoader]
         GG[GraphGenerator]
         PR[PlanRenderer]
@@ -16,13 +16,13 @@ graph TD
         PEM[PythonEnvManager]
     end
 
-    subgraph "Python Infrastructure"
+    subgraph Python ["Python Infrastructure"]
         Wrapper[resplan_loader_wrapper.py]
         Loader[resplan_loader.py]
         Venv[(Virtual Env)]
     end
 
-    subgraph "Data Source"
+    subgraph DataSource ["Data Source"]
         Pkl[Data.pkl]
     end
 
@@ -80,13 +80,13 @@ The library uses a set of rich domain models to represent floorplans and their c
 classDiagram
     class Plan {
         +int Id
-        +Dictionary~string, List~Geometry~~ Geometries
+        +Dictionary Geometries
         +Envelope Bounds
         +Graph ReferenceGraph
     }
 
     class Graph {
-        +Dictionary~string, Node~ Nodes
+        +Dictionary Nodes
         +List~Edge~ Edges
     }
 
