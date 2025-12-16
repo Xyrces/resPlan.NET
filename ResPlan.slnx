@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="ResPlan.Demo/ResPlan.Demo.csproj" />
+  <Project Path="ResPlan.Library/ResPlan.Library.csproj" />
+</Solution>
