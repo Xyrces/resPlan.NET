@@ -4,9 +4,22 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PackageId>ResPlan.Library</PackageId>
+    <Authors>ResPlan Contributors</Authors>
+    <Company>ResPlan</Company>
+    <Product>ResPlan</Product>
+    <Description>A library for working with the ResPlan dataset.</Description>
+    <RepositoryUrl>https://github.com/ResPlan/ResPlan</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>ResPlan;Dataset;Graph;Planning</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="MinVer" Version="6.0.0">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="NetTopologySuite" Version="2.6.0" />
     <PackageReference Include="SkiaSharp" Version="3.119.1" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.1" />
