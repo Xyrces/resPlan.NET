@@ -12,4 +12,19 @@
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="..\resplan_loader.py">
+      <Link>resplan_loader.py</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\resplan_utils.py">
+      <Link>resplan_utils.py</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\resplan_loader_wrapper.py">
+      <Link>resplan_loader_wrapper.py</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>
