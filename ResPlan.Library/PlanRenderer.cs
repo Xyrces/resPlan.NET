@@ -21,9 +21,10 @@ namespace ResPlan.Library
             { "balcony", SKColor.Parse("#b3b3b3") }     // dark gray
         };
 
+        // Matches resplan_utils.py order
         private static readonly List<string> DrawOrder = new List<string>
         {
-            "living", "bedroom", "bathroom", "kitchen", "balcony", "wall", "door", "window", "front_door"
+            "living", "bedroom", "bathroom", "kitchen", "door", "window", "wall", "front_door", "balcony"
         };
 
         public static void Render(Plan plan, string outputPath, int width = 800, int height = 800)
@@ -35,9 +36,7 @@ namespace ResPlan.Library
             var bounds = plan.Bounds;
             if (bounds == null || bounds.IsNull) return;
 
-            // Calculate fit to square logic matching Python script
-            // Python script expands bounds to be square.
-            // Width/Height
+            // Calculate fit to square logic
             double w = bounds.Width;
             double h = bounds.Height;
 
@@ -63,15 +62,10 @@ namespace ResPlan.Library
                 maxX = cx + half;
             }
 
-            // Now map [minX, maxX] -> [0, width]
-            // And [minY, maxY] -> [height, 0] (Inverted Y)
-
-            float scale = (float)(width / (maxX - minX)); // Since it's square, scaleX == scaleY
+            float scale = (float)(width / (maxX - minX));
 
             SKPoint Transform(double x, double y)
             {
-                // x' = (x - minX) * scale
-                // y' = height - (y - minY) * scale
                 return new SKPoint(
                     (float)((x - minX) * scale),
                     height - (float)((y - minY) * scale)
@@ -95,8 +89,7 @@ namespace ResPlan.Library
                 {
                     Color = SKColors.Black,
                     Style = SKPaintStyle.Stroke,
-                    StrokeWidth = 1, // Matplotlib linewidth=0.5. At scale? No, 0.5 points.
-                    // This is hard to match exactly. 1px is often close.
+                    StrokeWidth = 0.5f,
                     IsAntialias = true
                 };
 
@@ -155,7 +148,7 @@ namespace ResPlan.Library
                          {
                              Color = color,
                              Style = SKPaintStyle.Stroke,
-                             StrokeWidth = 2,
+                             StrokeWidth = 0.5f,
                              IsAntialias = true
                          };
                          canvas.DrawPath(path, linePaint);
