@@ -53,13 +53,13 @@ jobs:
       run: dotnet restore
 
     - name: Build
-      run: dotnet build --no-restore
+      run: dotnet build --no-restore --configuration Release
 
     - name: Test
-      run: dotnet test --no-build --verbosity normal
+      run: dotnet test --no-build --verbosity normal --configuration Release
 
     - name: Pack
-      run: dotnet pack ResPlan.Library/ResPlan.Library.csproj --no-build --output nupkgs
+      run: dotnet pack ResPlan.Library/ResPlan.Library.csproj --no-build --output nupkgs --configuration Release
 
     - name: Publish to GitHub Packages
       run: dotnet nuget push nupkgs/*.nupkg --source https://nuget.pkg.github.com/ResPlan/index.json --api-key ${{ secrets.GITHUB_TOKEN }} --skip-duplicate
@@ -72,4 +72,4 @@ jobs:
         name: comparison-images
         path: |
           ResPlan.Tests/ReferenceImages/*.png
-          ResPlan.Tests/bin/Debug/net9.0/actual_plan_*.png
+          ResPlan.Tests/bin/Release/net9.0/actual_plan_*.png
