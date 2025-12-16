@@ -42,7 +42,6 @@ def main():
     print(f"Loaded {len(plans)} plans.")
 
     samples = []
-    # Select a few indices. Using 0, 10, 50 as arbitrary samples.
     indices = [0, 10, 50]
 
     for idx in indices:
@@ -51,28 +50,41 @@ def main():
         plan = plans[idx]
         normalize_keys(plan)
 
-        # Analyze types
-        geom_types = analyze_types(plan)
-        print(f"  Geometry Types: {geom_types}")
+        # Collect geometries to determine bounds FIRST
+        categories = ["living","bedroom","bathroom","kitchen","door","window","wall","front_door","balcony"]
+        all_geoms = []
+        plan_export = {
+            'id': idx,
+            'geometries': {},
+            'reference_graph': None,
+            'bounds': [0,0,0,0]
+        }
+
+        for cat in categories:
+            if cat in plan:
+                geoms = get_geometries(plan[cat])
+                wkt_list = [wkt_dumps(g) for g in geoms]
+                if wkt_list:
+                    plan_export['geometries'][cat] = wkt_list
+                    all_geoms.extend(geoms)
+
+        minx, miny, maxx, maxy = 0, 0, 1, 1
+        if all_geoms:
+            minx = min(g.bounds[0] for g in all_geoms)
+            miny = min(g.bounds[1] for g in all_geoms)
+            maxx = max(g.bounds[2] for g in all_geoms)
+            maxy = max(g.bounds[3] for g in all_geoms)
+            plan_export['bounds'] = [minx, miny, maxx, maxy]
 
         # Generate Graph
         G = plan_to_graph(plan)
-        # Convert graph to serializable format
-        # Nodes: list of {id, type, area, geometry_wkt}
-        # Edges: list of {source, target, type}
-        graph_data = {
-            'nodes': [],
-            'edges': []
-        }
+        graph_data = {'nodes': [], 'edges': []}
 
         for n, data in G.nodes(data=True):
             node_info = {
                 'id': n,
                 'type': data.get('type'),
                 'area': data.get('area'),
-                # We won't export geometry for graph nodes in JSON to save space/complexity unless needed,
-                # but for verification it might be useful.
-                # 'geometry': wkt_dumps(data.get('geometry')) if 'geometry' in data else None
             }
             graph_data['nodes'].append(node_info)
 
@@ -84,51 +96,56 @@ def main():
             }
             graph_data['edges'].append(edge_info)
 
-        # Sort for deterministic output
         graph_data['nodes'].sort(key=lambda x: x['id'])
         graph_data['edges'].sort(key=lambda x: (x['source'], x['target']))
+        plan_export['reference_graph'] = graph_data
 
-        # Render Reference Image
-        fig, ax = plt.subplots(figsize=(8, 8))
-        plot_plan(plan, ax=ax, title=f"Plan {idx}")
+        # Render Reference Image with controlled bounds
+        # Use a fixed size and DPI
+        # 800x800 px
+        fig = plt.figure(figsize=(8, 8), dpi=100)
+        # Add axes covering the whole figure
+        ax = fig.add_axes([0, 0, 1, 1])
+
+        # Plot
+        # We reimplement basic plot loop to ensure we don't get unexpected margins from plot_plan helpers
+        # although plot_plan is quite standard.
+        # But we need to force limits.
+        plot_plan(plan, ax=ax, title=None, legend=False, tight=False)
+
+        # Force limits
+        # Add a small buffer to match Skia renderer logic if needed, OR just match exact bounds.
+        # Let's match exact bounds.
+        # But aspect ratio?
+        # 800x800 image is 1:1.
+        # Plan might not be 1:1.
+        # We need to center it.
+        # Skia logic: calculates scale to fit, then centers.
+        # Let's do same in Python.
+
+        w = maxx - minx
+        h = maxy - miny
+
+        # Expand bounds to be square to match 800x800 canvas
+        if w > h:
+            # wider
+            cy = (miny + maxy) / 2
+            half = w / 2
+            ax.set_ylim([cy - half, cy + half])
+            ax.set_xlim([minx, maxx])
+        else:
+            # taller
+            cx = (minx + maxx) / 2
+            half = h / 2
+            ax.set_xlim([cx - half, cx + half])
+            ax.set_ylim([miny, maxy])
+
+        ax.set_axis_off()
+
         # Save
         img_path = os.path.join(IMG_DIR, f'plan_{idx}.png')
         plt.savefig(img_path, dpi=100)
         plt.close(fig)
-
-        # Prepare data for JSON export
-        # We need to export the geometries of the plan so .NET can load them.
-        # We will use WKT.
-        plan_export = {
-            'id': idx,
-            'geometries': {},
-            'reference_graph': graph_data
-        }
-
-        # Categories usually plotted
-        categories = ["living","bedroom","bathroom","kitchen","door","window","wall","front_door","balcony"]
-
-        all_geoms = []
-
-        for cat in categories:
-            if cat in plan:
-                # plan[cat] can be a single geometry or list or Multi.
-                # resplan_utils.get_geometries flattens it to a list of atomic geometries
-                geoms = get_geometries(plan[cat])
-                wkt_list = [wkt_dumps(g) for g in geoms]
-                if wkt_list:
-                    plan_export['geometries'][cat] = wkt_list
-                    all_geoms.extend(geoms)
-
-        # Calculate bounds for .NET scaling
-        if all_geoms:
-            minx = min(g.bounds[0] for g in all_geoms)
-            miny = min(g.bounds[1] for g in all_geoms)
-            maxx = max(g.bounds[2] for g in all_geoms)
-            maxy = max(g.bounds[3] for g in all_geoms)
-            plan_export['bounds'] = [minx, miny, maxx, maxy]
-        else:
-            plan_export['bounds'] = [0,0,0,0]
 
         samples.append(plan_export)
 

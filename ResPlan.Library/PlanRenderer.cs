@@ -32,33 +32,49 @@ namespace ResPlan.Library
             var canvas = surface.Canvas;
             canvas.Clear(SKColors.White);
 
-            // Calculate Transform
-            // We need to fit plan.Bounds into width/height with some padding
-            // Python plot uses aspect='equal'
-
             var bounds = plan.Bounds;
-            if (bounds == null || bounds.IsNull) return; // Empty plan?
+            if (bounds == null || bounds.IsNull) return;
 
-            float padding = 20;
-            float drawW = width - 2 * padding;
-            float drawH = height - 2 * padding;
+            // Calculate fit to square logic matching Python script
+            // Python script expands bounds to be square.
+            // Width/Height
+            double w = bounds.Width;
+            double h = bounds.Height;
 
-            float scaleX = drawW / (float)bounds.Width;
-            float scaleY = drawH / (float)bounds.Height;
-            float scale = Math.Min(scaleX, scaleY);
+            double minX = bounds.MinX;
+            double minY = bounds.MinY;
+            double maxX = bounds.MaxX;
+            double maxY = bounds.MaxY;
 
-            // Invert Y because Skia's 0,0 is top-left, Geometry is bottom-left usually
-            // We will translate and scale.
+            if (w > h)
+            {
+                // wider, expand height
+                double cy = (minY + maxY) / 2.0;
+                double half = w / 2.0;
+                minY = cy - half;
+                maxY = cy + half;
+            }
+            else
+            {
+                // taller, expand width
+                double cx = (minX + maxX) / 2.0;
+                double half = h / 2.0;
+                minX = cx - half;
+                maxX = cx + half;
+            }
 
-            // Transform point (x, y) ->
-            // screenX = padding + (x - minX) * scale
-            // screenY = height - padding - (y - minY) * scale
+            // Now map [minX, maxX] -> [0, width]
+            // And [minY, maxY] -> [height, 0] (Inverted Y)
+
+            float scale = (float)(width / (maxX - minX)); // Since it's square, scaleX == scaleY
 
             SKPoint Transform(double x, double y)
             {
+                // x' = (x - minX) * scale
+                // y' = height - (y - minY) * scale
                 return new SKPoint(
-                    padding + (float)(x - bounds.MinX) * scale,
-                    height - padding - (float)(y - bounds.MinY) * scale
+                    (float)((x - minX) * scale),
+                    height - (float)((y - minY) * scale)
                 );
             }
 
@@ -79,7 +95,8 @@ namespace ResPlan.Library
                 {
                     Color = SKColors.Black,
                     Style = SKPaintStyle.Stroke,
-                    StrokeWidth = 1,
+                    StrokeWidth = 1, // Matplotlib linewidth=0.5. At scale? No, 0.5 points.
+                    // This is hard to match exactly. 1px is often close.
                     IsAntialias = true
                 };
 
@@ -103,7 +120,6 @@ namespace ResPlan.Library
                         // Holes
                         for (int i = 0; i < poly.NumInteriorRings; i++)
                         {
-                             // Simple hole handling? Skia supports EvenOdd fill
                              var hole = poly.GetInteriorRingN(i).Coordinates;
                              if (hole.Length > 0)
                              {
@@ -134,14 +150,6 @@ namespace ResPlan.Library
                                  path.LineTo(Transform(coords[i].X, coords[i].Y));
                              }
                          }
-                         // For LineString, use the fill color as stroke?
-                         // Python plot uses facecolor for polygons, edge is black.
-                         // But if it's a LineString (like window maybe?), it should be drawn.
-                         // resplan_utils.py plot_plan fills geometries.
-                         // LineStrings can't be filled effectively.
-
-                         // Check resplan_utils logic: gseries.plot(ax=ax, color=color_list, edgecolor="black", linewidth=0.5)
-                         // For LineString in matplotlib, color arg sets the line color.
 
                          using var linePaint = new SKPaint
                          {
