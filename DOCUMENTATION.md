@@ -44,7 +44,7 @@ graph TD
 The `PlanLoader` does not parse the `.pkl` files directly in C#. Instead, it orchestrates a Python subprocess to perform this task. This ensures compatibility with the original data format without reimplementing complex `pickle` logic in .NET.
 
 **Process Flow:**
-1.  **Dependency Check**: `PythonEnvManager` ensures a local virtual environment exists and required packages (e.g., `shapely`, `networkx`, `numpy`) are installed.
+1.  **Dependency Check**: `PythonEnvManager` ensures a local virtual environment exists and required packages (e.g., `shapely`, `networkx`, `numpy`) are installed. It streams progress (e.g., pip install output) via a provided logger.
 2.  **Execution**: `PlanLoader` invokes `resplan_loader_wrapper.py` using the Python interpreter from the virtual environment.
 3.  **Data Streaming**: The Python script loads the `.pkl` data, converts it to a clean JSON structure, and prints it to `stdout`.
 4.  **Deserialization**: `PlanLoader` captures `stdout`, extracts the JSON payload, and deserializes it into `ResPlanData` C# objects, which are then converted to the rich `Plan` domain model.
@@ -57,8 +57,9 @@ sequenceDiagram
     participant Py as Python Subprocess
     participant Data as Data File (.pkl)
 
-    App->>PL: LoadPlansAsync()
-    PL->>PEM: EnsureDependencies()
+    App->>PL: LoadPlansAsync(logger)
+    PL->>PEM: EnsureDependencies(logger)
+    PEM-->>App: Stream "Installing dependencies..."
     PEM->>PEM: Check/Create Venv
     PEM-->>PL: Ready
     PL->>Py: Start Process (wrapper.py)
@@ -134,10 +135,11 @@ classDiagram
 
 Handles the loading of plan data.
 
-*   `static Task<List<Plan>> LoadPlansAsync(string jsonPath = null, string pklPathOverride = null, int? maxItems = null)`
+*   `static Task<List<Plan>> LoadPlansAsync(string jsonPath = null, string pklPathOverride = null, int? maxItems = null, Action<string> logger = null)`
     *   **jsonPath**: Optional path to a pre-converted JSON file. If provided, skips Python execution.
     *   **pklPathOverride**: Optional path to a specific `.pkl` file. If null, defaults to the managed dataset path.
     *   **maxItems**: Optional limit on the number of plans to load.
+    *   **logger**: Optional callback to receive real-time progress updates (e.g., dependency installation logs, download progress).
     *   **Returns**: A list of `Plan` objects.
 
 ### `ResPlan.Library.GraphGenerator`

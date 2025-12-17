@@ -21,14 +21,24 @@ The following examples demonstrate the core functionality of the library.
 
 The `PlanLoader` class handles loading data. It uses a Python subprocess to parse the original `.pkl` data files securely.
 
+You can optionally provide a logger callback to stream progress updates (e.g., dependency installation, data download progress).
+
 ```csharp
 using ResPlan.Library;
+
+// Define a simple logger
+Action<string> logger = (msg) => Console.WriteLine($"[ResPlan] {msg}");
 
 // Load plans.
 // Passing 'null' as the first argument triggers the default behavior:
 // It ensures the data and Python dependencies are present, then loads the dataset.
 // 'maxItems' is optional, used here to limit the load for demonstration.
-var plans = await PlanLoader.LoadPlansAsync(null, maxItems: 10);
+var plans = await PlanLoader.LoadPlansAsync(
+    jsonPath: null,
+    pklPathOverride: null,
+    maxItems: 10,
+    logger: logger
+);
 
 Console.WriteLine($"Loaded {plans.Count} plans.");
 ```
