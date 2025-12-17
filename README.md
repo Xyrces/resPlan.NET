@@ -79,6 +79,27 @@ foreach (var plan in plans)
 
 For a deep dive into the architecture, internal mechanisms (including the Python integration), and detailed API reference, please see [DOCUMENTATION.md](DOCUMENTATION.md).
 
+## Attribution & Citation
+
+This library is a port of the [ResPlan](https://github.com/m-agour/ResPlan) project. The original dataset and code were developed by Mohamed Abouagour and Eleftherios Garyfallidis.
+
+If you use this library or the ResPlan dataset in your research, please cite the original paper:
+
+```bibtex
+@article{AbouagourGaryfallidis2025ResPlan,
+  title   = {ResPlan: A Large-Scale Vector-Graph Dataset of 17,000 Residential Floor Plans},
+  author  = {Abouagour, Mohamed and Garyfallidis, Eleftherios},
+  journal = {arXiv preprint arXiv:2508.14006},
+  year    = {2025},
+  doi     = {10.48550/arXiv.2508.14006},
+  url     = {https://arxiv.org/abs/2508.14006}
+}
+```
+
 ## License
 
-[License Information Here]
+This project (ResPlan.NET) is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for details.
+
+### Dataset License
+
+The **ResPlan dataset** (the `.pkl` files and derived data) is distributed by the original authors. According to the [Kaggle distribution](https://www.kaggle.com/datasets/resplan/resplan), the dataset is licensed under **CC BY-NC-SA 4.0** (Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International). Users are responsible for adhering to the dataset's license terms.
