@@ -12,8 +12,10 @@ namespace ResPlan.Library.Data
         private const string DataDir = "ResPlan";
         private const string PklFile = "ResPlan.pkl";
 
-        public static async Task EnsureDataAsync()
+        public static async Task EnsureDataAsync(Action<string> logger = null)
         {
+            var log = logger ?? Console.WriteLine;
+
             var baseDir = AppDomain.CurrentDomain.BaseDirectory;
             // Find root where ResPlan folder should be
             // Similar logic to finding venv, or we just put it relative to execution
@@ -25,7 +27,7 @@ namespace ResPlan.Library.Data
 
             if (File.Exists(dataPath))
             {
-                Console.WriteLine($"Data found at {dataPath}");
+                log($"Data found at {dataPath}");
                 return;
             }
 
@@ -36,7 +38,7 @@ namespace ResPlan.Library.Data
                  var checkPath = Path.Combine(current.FullName, DataDir, PklFile);
                  if (File.Exists(checkPath))
                  {
-                     Console.WriteLine($"Data found at {checkPath}");
+                     log($"Data found at {checkPath}");
                      return;
                  }
                  if (File.Exists(Path.Combine(current.FullName, "ResPlan.slnx")))
@@ -48,7 +50,7 @@ namespace ResPlan.Library.Data
                  current = current.Parent;
             }
 
-            Console.WriteLine("ResPlan data not found. Downloading...");
+            log("ResPlan data not found. Downloading...");
             var targetDir = Path.Combine(workingDir, DataDir);
             if (!Directory.Exists(targetDir))
             {
@@ -59,16 +61,41 @@ namespace ResPlan.Library.Data
 
             using (var client = new HttpClient())
             {
-                using (var s = await client.GetStreamAsync(ResPlanUrl))
+                // We should implement progress reporting for download if possible
+                using (var response = await client.GetAsync(ResPlanUrl, HttpCompletionOption.ResponseHeadersRead))
                 {
+                    response.EnsureSuccessStatusCode();
+                    var contentLength = response.Content.Headers.ContentLength;
+
+                    using (var s = await response.Content.ReadAsStreamAsync())
                     using (var fs = new FileStream(zipPath, FileMode.Create))
                     {
-                        await s.CopyToAsync(fs);
+                        if (contentLength.HasValue && logger != null)
+                        {
+                            var buffer = new byte[8192];
+                            long totalRead = 0;
+                            int read;
+                            long lastReport = 0;
+                            while ((read = await s.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                            {
+                                await fs.WriteAsync(buffer, 0, read);
+                                totalRead += read;
+                                if (totalRead - lastReport > 1024 * 1024) // report every 1MB
+                                {
+                                    log($"Downloading: {totalRead / 1024 / 1024} MB / {contentLength / 1024 / 1024} MB");
+                                    lastReport = totalRead;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            await s.CopyToAsync(fs);
+                        }
                     }
                 }
             }
 
-            Console.WriteLine("Extracting...");
+            log("Extracting...");
             ZipFile.ExtractToDirectory(zipPath, targetDir, overwriteFiles: true);
 
             // Verify extraction
@@ -83,7 +110,7 @@ namespace ResPlan.Library.Data
                  var files = Directory.GetFiles(targetDir, "*.pkl", SearchOption.AllDirectories);
                  if (files.Length > 0)
                  {
-                     Console.WriteLine($"Data extracted to {files[0]}");
+                     log($"Data extracted to {files[0]}");
                      // If it is in a subdir, we might want to move it or return the path
                  }
                  else
@@ -93,7 +120,7 @@ namespace ResPlan.Library.Data
             }
             else
             {
-                Console.WriteLine("Extraction complete.");
+                log("Extraction complete.");
             }
         }
 

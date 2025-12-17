@@ -15,7 +15,7 @@ namespace ResPlan.Library
     {
         private static readonly WKTReader _wktReader = new WKTReader();
 
-        public static async Task<List<Plan>> LoadPlansAsync(string jsonPath = null, string pklPathOverride = null, int? maxItems = null)
+        public static async Task<List<Plan>> LoadPlansAsync(string jsonPath = null, string pklPathOverride = null, int? maxItems = null, Action<string> logger = null)
         {
             if (!string.IsNullOrEmpty(jsonPath) && File.Exists(jsonPath))
             {
@@ -24,9 +24,9 @@ namespace ResPlan.Library
 
             // Python Loading Path (Subprocess approach due to Python.NET threading issues in some envs)
 
-            // Only ensure data if we are not overriding the pkl path, OR if we want to ensure deps.
-            // We always need dependencies.
-            PythonEnvManager.EnsureDependencies();
+            Action<string> actualLogger = logger ?? Console.WriteLine;
+
+            PythonEnvManager.EnsureDependencies(actualLogger);
 
             string pklPath;
             if (!string.IsNullOrEmpty(pklPathOverride))
@@ -35,7 +35,7 @@ namespace ResPlan.Library
             }
             else
             {
-                 await DataManager.EnsureDataAsync();
+                 await DataManager.EnsureDataAsync(actualLogger);
                  pklPath = DataManager.GetDataPath();
             }
             var plans = new List<Plan>();
@@ -49,7 +49,7 @@ namespace ResPlan.Library
                 throw new FileNotFoundException("resplan_loader_wrapper.py not found");
             }
 
-            Console.WriteLine($"Loading data from {pklPath} using Python subprocess...");
+            actualLogger($"Loading data from {pklPath} using Python subprocess...");
 
             var pythonExe = PythonEnvManager.GetPythonPath(PythonEnvManager.GetVenvPath());
 
@@ -108,8 +108,8 @@ namespace ResPlan.Library
                 }
                 else
                 {
-                     Console.WriteLine("Warning: No JSON found in output.");
-                     Console.WriteLine(stdout);
+                     actualLogger("Warning: No JSON found in output.");
+                     actualLogger(stdout);
                 }
             }
 

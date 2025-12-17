@@ -31,24 +31,24 @@ namespace ResPlan.Library.PythonInfrastructure
             return Path.Combine(Directory.GetCurrentDirectory(), VenvDir);
         }
 
-        public static void EnsureEnvironment()
+        public static void EnsureEnvironment(Action<string> logger = null)
         {
-            EnsureDependencies();
+            EnsureDependencies(logger);
         }
 
-        public static void EnsureDependencies()
+        public static void EnsureDependencies(Action<string> logger = null)
         {
             var venvPath = GetVenvPath();
             var pythonPath = GetPythonPath(venvPath);
 
             if (!Directory.Exists(venvPath) || !File.Exists(pythonPath))
             {
-                Console.WriteLine("Creating Python virtual environment...");
-                CreateVenv(venvPath);
+                logger?.Invoke("Creating Python virtual environment...");
+                CreateVenv(venvPath, logger);
             }
 
-            Console.WriteLine("Installing dependencies...");
-            InstallDependencies(venvPath);
+            logger?.Invoke("Installing dependencies...");
+            InstallDependencies(venvPath, logger);
         }
 
         public static string GetPythonPath(string venvPath)
@@ -60,7 +60,7 @@ namespace ResPlan.Library.PythonInfrastructure
             return Path.Combine(venvPath, "bin", "python3");
         }
 
-        private static void CreateVenv(string venvPath)
+        private static void CreateVenv(string venvPath, Action<string> logger = null)
         {
             // Determine python command (python on Windows, python3 on Linux/Mac)
             string pythonCmd = "python3";
@@ -75,16 +75,46 @@ namespace ResPlan.Library.PythonInfrastructure
                 Arguments = $"-m venv \"{venvPath}\"",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
-                UseShellExecute = false
+                UseShellExecute = false,
+                CreateNoWindow = true
             };
 
             try
             {
-                using var p = Process.Start(psi);
+                using var p = new Process { StartInfo = psi };
+
+                if (logger != null)
+                {
+                    p.OutputDataReceived += (sender, e) => { if (e.Data != null) logger(e.Data); };
+                    p.ErrorDataReceived += (sender, e) => { if (e.Data != null) logger(e.Data); };
+                }
+
+                p.Start();
+
+                if (logger != null)
+                {
+                    p.BeginOutputReadLine();
+                    p.BeginErrorReadLine();
+                }
+
                 p.WaitForExit();
+
                 if (p.ExitCode != 0)
                 {
-                    throw new Exception($"Failed to create venv: {p.StandardError.ReadToEnd()}");
+                     // If we are not logging, we might want to capture stderr to throw.
+                     // But we can't easily capture it if we didn't hook up events or redirected to logger.
+                     // If logger is null, we can't read from StandardError because we didn't call BeginErrorReadLine (which consumes it).
+                     // But wait, if logger is null, we are not calling BeginErrorReadLine. Can we read p.StandardError.ReadToEnd() after WaitForExit?
+                     // Yes, if we didn't start async read.
+
+                     if (logger == null)
+                     {
+                         throw new Exception($"Failed to create venv: {p.StandardError.ReadToEnd()}");
+                     }
+                     else
+                     {
+                         throw new Exception($"Failed to create venv. Check logs for details. Exit code: {p.ExitCode}");
+                     }
                 }
             }
             catch(Exception ex)
@@ -93,7 +123,7 @@ namespace ResPlan.Library.PythonInfrastructure
             }
         }
 
-        private static void InstallDependencies(string venvPath)
+        private static void InstallDependencies(string venvPath, Action<string> logger = null)
         {
             var pythonPath = GetPythonPath(venvPath);
             // opencv-python-headless required by resplan_utils
@@ -106,16 +136,38 @@ namespace ResPlan.Library.PythonInfrastructure
                 Arguments = $"-m pip install {packages}",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
-                UseShellExecute = false
+                UseShellExecute = false,
+                CreateNoWindow = true
             };
 
-            using var p = Process.Start(psi);
-            p.WaitForExit();
-             if (p.ExitCode != 0)
+            using var p = new Process { StartInfo = psi };
+
+            if (logger != null)
             {
-                // check if packages are already installed
-                // pip install will exit 0 even if already satisfied usually
-                Console.WriteLine($"Pip install warning/error: {p.StandardError.ReadToEnd()}");
+                p.OutputDataReceived += (sender, e) => { if (e.Data != null) logger(e.Data); };
+                p.ErrorDataReceived += (sender, e) => { if (e.Data != null) logger(e.Data); };
+            }
+
+            p.Start();
+
+            if (logger != null)
+            {
+                p.BeginOutputReadLine();
+                p.BeginErrorReadLine();
+            }
+
+            p.WaitForExit();
+
+            if (p.ExitCode != 0)
+            {
+                if (logger == null)
+                {
+                    Console.WriteLine($"Pip install warning/error: {p.StandardError.ReadToEnd()}");
+                }
+                else
+                {
+                    logger($"Pip install exited with code {p.ExitCode}.");
+                }
             }
         }
     }
