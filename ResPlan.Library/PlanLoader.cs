@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using NetTopologySuite.Geometries;
@@ -89,7 +90,8 @@ namespace ResPlan.Library
 
                 var options = new JsonSerializerOptions
                 {
-                    PropertyNameCaseInsensitive = true
+                    PropertyNameCaseInsensitive = true,
+                    NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals
                 };
 
                 // Find JSON start/end if there is noise
@@ -126,7 +128,25 @@ namespace ResPlan.Library
 
             if (data.Bounds != null && data.Bounds.Length == 4)
             {
-                plan.Bounds = new Envelope(data.Bounds[0], data.Bounds[2], data.Bounds[1], data.Bounds[3]);
+                // Check for NaN or Infinity
+                bool hasInvalidBounds = false;
+                foreach (var val in data.Bounds)
+                {
+                    if (double.IsNaN(val) || double.IsInfinity(val))
+                    {
+                        hasInvalidBounds = true;
+                        break;
+                    }
+                }
+
+                if (hasInvalidBounds)
+                {
+                     plan.Bounds = new Envelope();
+                }
+                else
+                {
+                    plan.Bounds = new Envelope(data.Bounds[0], data.Bounds[2], data.Bounds[1], data.Bounds[3]);
+                }
             }
 
             if (data.Geometries != null)
@@ -193,7 +213,8 @@ namespace ResPlan.Library
             var json = File.ReadAllText(jsonPath);
             var options = new JsonSerializerOptions
             {
-                PropertyNameCaseInsensitive = true
+                PropertyNameCaseInsensitive = true,
+                NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals
             };
             var dataList = JsonSerializer.Deserialize<List<ResPlanData>>(json, options);
             var plans = new List<Plan>();
