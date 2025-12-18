@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using MessagePack;
 using NetTopologySuite.Geometries;
 using ResPlan.Library.Data;
 
@@ -36,35 +37,52 @@ namespace ResPlan.Library
         public string Type { get; set; }
     }
 
+    [MessagePackObject]
     public class Plan
     {
+        [Key(0)]
         public int Id { get; set; }
+        [Key(1)]
         public Dictionary<string, List<Geometry>> Geometries { get; set; } = new Dictionary<string, List<Geometry>>();
 
         [JsonConverter(typeof(EnvelopeJsonConverter))]
+        [Key(2)]
         public Envelope Bounds { get; set; }
 
+        [Key(3)]
         public Graph ReferenceGraph { get; set; }
     }
 
+    [MessagePackObject]
     public class Graph
     {
+        [Key(0)]
         public Dictionary<string, Node> Nodes { get; set; } = new Dictionary<string, Node>();
+        [Key(1)]
         public List<Edge> Edges { get; set; } = new List<Edge>();
     }
 
+    [MessagePackObject]
     public class Node
     {
+        [Key(0)]
         public string Id { get; set; }
+        [Key(1)]
         public string Type { get; set; }
+        [Key(2)]
         public Geometry Geometry { get; set; }
+        [Key(3)]
         public double Area { get; set; }
     }
 
+    [MessagePackObject]
     public class Edge
     {
+        [Key(0)]
         public string SourceId { get; set; }
+        [Key(1)]
         public string TargetId { get; set; }
+        [Key(2)]
         public string Type { get; set; }
     }
 }
