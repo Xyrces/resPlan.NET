@@ -176,11 +176,17 @@ namespace ResPlan.Library
                 {
                     foreach(var n in data.ReferenceGraph.Nodes)
                     {
+                        var area = n.Area ?? 0;
+                        if (double.IsNaN(area) || double.IsInfinity(area))
+                        {
+                            area = 0;
+                        }
+
                         plan.ReferenceGraph.Nodes[n.Id] = new Node
                         {
                             Id = n.Id,
                             Type = n.Type,
-                            Area = n.Area ?? 0
+                            Area = area
                         };
                     }
                 }
