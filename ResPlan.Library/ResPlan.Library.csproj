@@ -29,14 +29,23 @@
     <Content Include="..\resplan_loader.py">
       <Link>resplan_loader.py</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>true</Pack>
+      <PackagePath>contentFiles/any/any;content</PackagePath>
+      <PackageCopyToOutput>true</PackageCopyToOutput>
     </Content>
     <Content Include="..\resplan_utils.py">
       <Link>resplan_utils.py</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>true</Pack>
+      <PackagePath>contentFiles/any/any;content</PackagePath>
+      <PackageCopyToOutput>true</PackageCopyToOutput>
     </Content>
     <Content Include="..\resplan_loader_wrapper.py">
       <Link>resplan_loader_wrapper.py</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>true</Pack>
+      <PackagePath>contentFiles/any/any;content</PackagePath>
+      <PackageCopyToOutput>true</PackageCopyToOutput>
     </Content>
   </ItemGroup>
 
