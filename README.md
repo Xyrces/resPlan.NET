@@ -85,6 +85,24 @@ foreach (var plan in plans)
 }
 ```
 
+### 4. Serialization
+
+To support binary serialization and handle special floating-point values (like `NaN` or `Infinity`) which are not standard in JSON, the library provides a helper class `PlanSerializer` using **MessagePack**.
+
+```csharp
+using ResPlan.Library.Data;
+
+// Serialize a Plan to a byte array
+byte[] data = PlanSerializer.Serialize(plan);
+
+// Deserialize back to a Plan object
+Plan loadedPlan = PlanSerializer.Deserialize(data);
+
+// Or save/load directly to file
+PlanSerializer.SaveToFile(plan, "plan.msgpack");
+var loadedFromFile = PlanSerializer.LoadFromFile("plan.msgpack");
+```
+
 ## Documentation
 
 For a deep dive into the architecture, internal mechanisms (including the Python integration), and detailed API reference, please see [DOCUMENTATION.md](DOCUMENTATION.md).

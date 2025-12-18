@@ -142,6 +142,18 @@ Handles the loading of plan data.
     *   **logger**: Optional callback to receive real-time progress updates (e.g., dependency installation logs, download progress).
     *   **Returns**: A list of `Plan` objects.
 
+### `ResPlan.Library.Data.PlanSerializer`
+
+Helper class for binary serialization using MessagePack.
+
+*   `static byte[] Serialize(Plan plan)` / `static Plan Deserialize(byte[] bytes)`
+    *   Serializes/Deserializes `Plan` objects to/from MessagePack binary format.
+    *   **Features**:
+        *   Supports `double.NaN` and `double.Infinity` (unlike standard JSON).
+        *   Uses custom formatters for `NetTopologySuite.Geometries.Geometry` (WKB format) and `Envelope`.
+*   `static void SaveToFile(Plan plan, string filePath)` / `static Plan LoadFromFile(string filePath)`
+    *   Convenience wrappers for file I/O.
+
 ### `ResPlan.Library.GraphGenerator`
 
 Generates connectivity graphs from `Plan` geometries.
