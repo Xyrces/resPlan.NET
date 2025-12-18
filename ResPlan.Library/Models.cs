@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using NetTopologySuite.Geometries;
+using ResPlan.Library.Data;
 
 namespace ResPlan.Library
 {
@@ -39,7 +40,10 @@ namespace ResPlan.Library
     {
         public int Id { get; set; }
         public Dictionary<string, List<Geometry>> Geometries { get; set; } = new Dictionary<string, List<Geometry>>();
+
+        [JsonConverter(typeof(EnvelopeJsonConverter))]
         public Envelope Bounds { get; set; }
+
         public Graph ReferenceGraph { get; set; }
     }
 
