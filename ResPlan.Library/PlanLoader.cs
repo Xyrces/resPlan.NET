@@ -16,11 +16,14 @@ namespace ResPlan.Library
     {
         private static readonly WKTReader _wktReader = new WKTReader();
 
-        public static async Task<List<Plan>> LoadPlansAsync(string jsonPath = null, string pklPathOverride = null, int? maxItems = null, Action<string> logger = null)
+        public static async Task<List<Plan>> LoadPlansAsync(string jsonPath = null, string pklPathOverride = null, int? maxItems = null, Action<string> logger = null, PlanGenerationConstraints constraints = null)
         {
             if (!string.IsNullOrEmpty(jsonPath) && File.Exists(jsonPath))
             {
-                return LoadPlansFromJson(jsonPath);
+                // In this path, we don't apply constraints inside LoadPlansFromJson for now, or we should?
+                // The prompt says "When using the API". It's better to be consistent.
+                var loaded = LoadPlansFromJson(jsonPath);
+                return ApplyConstraints(loaded, constraints, logger);
             }
 
             // Python Loading Path (Subprocess approach due to Python.NET threading issues in some envs)
@@ -115,7 +118,79 @@ namespace ResPlan.Library
                 }
             }
 
-            return plans;
+            return ApplyConstraints(plans, constraints, actualLogger);
+        }
+
+        private static List<Plan> ApplyConstraints(List<Plan> plans, PlanGenerationConstraints constraints, Action<string> logger)
+        {
+            if (constraints == null) return plans;
+
+            if (constraints.GarageFacing.HasValue)
+            {
+                logger?.Invoke("Warning: Garage/Driveway facing constraints are not supported by the current ResPlan dataset.");
+            }
+
+            var result = new List<Plan>();
+            foreach (var plan in plans)
+            {
+                // Apply Facing Constraint
+                if (constraints.FrontDoorFacing.HasValue)
+                {
+                    // Find front door
+                    Geometry frontDoor = null;
+                    if (plan.Geometries.ContainsKey("front_door"))
+                    {
+                        var fds = plan.Geometries["front_door"];
+                        if (fds.Count > 0)
+                        {
+                            // If multiple, pick first?
+                            frontDoor = fds[0];
+                        }
+                    }
+
+                    if (frontDoor != null)
+                    {
+                        var centroid = frontDoor.Centroid.Coordinate;
+                        var planCenter = plan.Bounds.Centre; // Envelope center
+
+                        // Vector from plan center to door center
+                        var currentVec = new NetTopologySuite.Geometries.Coordinate(centroid.X - planCenter.X, centroid.Y - planCenter.Y);
+
+                        // If center and door are same (rare), skip
+                        if (Math.Abs(currentVec.X) > 1e-6 || Math.Abs(currentVec.Y) > 1e-6)
+                        {
+                            var targetX = constraints.FrontDoorFacing.Value.X;
+                            var targetY = constraints.FrontDoorFacing.Value.Y;
+
+                            // Angle of current vector
+                            var currentAngle = Math.Atan2(currentVec.Y, currentVec.X);
+                            // Angle of target
+                            var targetAngle = Math.Atan2(targetY, targetX);
+
+                            var diff = targetAngle - currentAngle;
+
+                            plan.Rotate(diff, planCenter);
+                        }
+                    }
+                }
+
+                // Apply Bounding Constraint
+                if (constraints.BoundingPolygon != null)
+                {
+                    // Check if plan bounds are within polygon
+                    // Since plan.Bounds is an Envelope, we convert to geometry
+                    var geometryFactory = new GeometryFactory();
+                    var planGeom = geometryFactory.ToGeometry(plan.Bounds);
+
+                    if (!constraints.BoundingPolygon.Contains(planGeom))
+                    {
+                        continue; // Filter out
+                    }
+                }
+
+                result.Add(plan);
+            }
+            return result;
         }
 
         private static Plan ConvertDataToPlan(ResPlanData data)

@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json.Serialization;
 using MessagePack;
 using NetTopologySuite.Geometries;
+using NetTopologySuite.Geometries.Utilities;
 using ResPlan.Library.Data;
 
 namespace ResPlan.Library
@@ -51,6 +53,61 @@ namespace ResPlan.Library
 
         [Key(3)]
         public Graph ReferenceGraph { get; set; }
+
+        public void Rotate(double angleRadians, Coordinate center)
+        {
+            var transform = new AffineTransformation();
+            transform.Rotate(angleRadians, center.X, center.Y);
+
+            ApplyTransformation(transform);
+        }
+
+        public void Translate(double dx, double dy)
+        {
+            var transform = new AffineTransformation();
+            transform.Translate(dx, dy);
+
+            ApplyTransformation(transform);
+        }
+
+        private void ApplyTransformation(AffineTransformation transform)
+        {
+            // Transform geometries
+            foreach (var key in Geometries.Keys.ToList())
+            {
+                var originalList = Geometries[key];
+                var newList = new List<Geometry>();
+                foreach (var geom in originalList)
+                {
+                    var newGeom = transform.Transform(geom);
+                    newList.Add(newGeom);
+                }
+                Geometries[key] = newList;
+            }
+
+            // Update Bounds
+            var newEnvelope = new Envelope();
+            foreach (var list in Geometries.Values)
+            {
+                foreach (var geom in list)
+                {
+                    newEnvelope.ExpandToInclude(geom.EnvelopeInternal);
+                }
+            }
+            Bounds = newEnvelope;
+
+            // Transform Graph Nodes
+            if (ReferenceGraph != null && ReferenceGraph.Nodes != null)
+            {
+                foreach (var node in ReferenceGraph.Nodes.Values)
+                {
+                    if (node.Geometry != null)
+                    {
+                        node.Geometry = transform.Transform(node.Geometry);
+                    }
+                }
+            }
+        }
     }
 
     [MessagePackObject]
