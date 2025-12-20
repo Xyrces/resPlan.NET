@@ -160,7 +160,7 @@ Handles the loading of plan data.
     *   **maxItems**: Optional limit on the number of plans to load.
     *   **logger**: Optional callback to receive real-time progress updates (e.g., dependency installation logs, download progress).
     *   **constraints**: Optional `PlanGenerationConstraints` to filter or orient plans.
-        *   **BoundingPolygon**: If set, only plans whose bounds are completely contained within this polygon are returned.
+        *   **BoundingPolygon**: If set, only plans whose geometry is completely contained within this polygon are returned. The check first validates the plan's Axis-Aligned Bounding Box (AABB) for performance, and if that fails, performs a precise geometry-by-geometry containment check to support rotated plans.
         *   **FrontDoorFacing**: If set, plans are rotated so their front door (vector from center to door) aligns with this vector.
         *   **GarageFacing**: Currently unsupported; will log a warning if set.
     *   **Returns**: A list of `Plan` objects.
