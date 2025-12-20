@@ -43,7 +43,43 @@ var plans = await PlanLoader.LoadPlansAsync(
 Console.WriteLine($"Loaded {plans.Count} plans.");
 ```
 
-### 2. Generating Connectivity Graphs
+### 2. Applying Constraints (Optional)
+
+You can filter and orient plans using `PlanGenerationConstraints`.
+
+```csharp
+using NetTopologySuite.Geometries;
+using System.Numerics;
+
+// Define a bounding box polygon (must contain the plan)
+var coordinates = new[]
+{
+    new Coordinate(0, 0),
+    new Coordinate(100, 0),
+    new Coordinate(100, 100),
+    new Coordinate(0, 100),
+    new Coordinate(0, 0) // Close the loop
+};
+var boundingPoly = new GeometryFactory().CreatePolygon(coordinates);
+
+// Define constraints
+var constraints = new PlanGenerationConstraints
+{
+    // Filter: Plan must fit inside this polygon
+    BoundingPolygon = boundingPoly,
+
+    // Orientation: Rotate plan so the front door faces "Up" (positive Y)
+    FrontDoorFacing = new Vector2(0, 1)
+};
+
+var constrainedPlans = await PlanLoader.LoadPlansAsync(
+    maxItems: 5,
+    logger: logger,
+    constraints: constraints
+);
+```
+
+### 3. Generating Connectivity Graphs
 
 Once a `Plan` is loaded, you can generate a graph representing the connectivity between rooms, doors, and windows using `GraphGenerator`.
 
@@ -67,7 +103,7 @@ foreach (var plan in plans)
 }
 ```
 
-### 3. Rendering Floorplans
+### 4. Rendering Floorplans
 
 You can visualize the floorplan using `PlanRenderer`. This uses SkiaSharp to produce an image file.
 
@@ -85,7 +121,7 @@ foreach (var plan in plans)
 }
 ```
 
-### 4. Serialization
+### 5. Serialization
 
 To support binary serialization and handle special floating-point values (like `NaN` or `Infinity`) which are not standard in JSON, the library provides a helper class `PlanSerializer` using **MessagePack**.
 
