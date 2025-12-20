@@ -143,22 +143,40 @@ namespace ResPlan.Library
         public string Type { get; set; }
     }
 
+    /// <summary>
+    /// Represents a multi-story building composed of stacked floor plans.
+    /// </summary>
     [MessagePackObject]
     public class Building
     {
+        /// <summary>
+        /// The list of floors in the building, typically ordered by floor number.
+        /// </summary>
         [Key(0)]
         public List<BuildingFloor> Floors { get; set; } = new List<BuildingFloor>();
     }
 
+    /// <summary>
+    /// Represents a single floor within a building.
+    /// </summary>
     [MessagePackObject]
     public class BuildingFloor
     {
+        /// <summary>
+        /// The 0-based index of the floor.
+        /// </summary>
         [Key(0)]
         public int FloorNumber { get; set; }
 
+        /// <summary>
+        /// The floor plan associated with this level.
+        /// </summary>
         [Key(1)]
         public Plan Plan { get; set; }
 
+        /// <summary>
+        /// Additional geometries generated for this floor (e.g., stairs, corridors) that are not part of the original plan.
+        /// </summary>
         [Key(2)]
         public Dictionary<string, List<Geometry>> AdditionalGeometries { get; set; } = new Dictionary<string, List<Geometry>>();
     }

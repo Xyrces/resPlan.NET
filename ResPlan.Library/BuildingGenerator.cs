@@ -6,10 +6,19 @@ using NetTopologySuite.Geometries.Utilities;
 
 namespace ResPlan.Library
 {
+    /// <summary>
+    /// Generates multi-story buildings by stacking compatible floor plans.
+    /// </summary>
     public class BuildingGenerator
     {
         private readonly GeometryFactory _geometryFactory = new GeometryFactory();
 
+        /// <summary>
+        /// Generates a building with a specified number of floors using the provided plans.
+        /// </summary>
+        /// <param name="availablePlans">A list of candidate plans to stack.</param>
+        /// <param name="targetFloors">The desired number of floors.</param>
+        /// <returns>A <see cref="Building"/> object containing the stacked floors.</returns>
         public Building GenerateBuilding(List<Plan> availablePlans, int targetFloors)
         {
             var building = new Building();
