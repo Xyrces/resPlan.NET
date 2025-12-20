@@ -142,4 +142,24 @@ namespace ResPlan.Library
         [Key(2)]
         public string Type { get; set; }
     }
+
+    [MessagePackObject]
+    public class Building
+    {
+        [Key(0)]
+        public List<BuildingFloor> Floors { get; set; } = new List<BuildingFloor>();
+    }
+
+    [MessagePackObject]
+    public class BuildingFloor
+    {
+        [Key(0)]
+        public int FloorNumber { get; set; }
+
+        [Key(1)]
+        public Plan Plan { get; set; }
+
+        [Key(2)]
+        public Dictionary<string, List<Geometry>> AdditionalGeometries { get; set; } = new Dictionary<string, List<Geometry>>();
+    }
 }
