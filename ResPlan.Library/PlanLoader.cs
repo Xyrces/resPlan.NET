@@ -175,22 +175,49 @@ namespace ResPlan.Library
                 }
 
                 // Apply Bounding Constraint
-                if (constraints.BoundingPolygon != null)
+                if (!IsPlanCompatible(plan, constraints.BoundingPolygon))
                 {
-                    // Check if plan bounds are within polygon
-                    // Since plan.Bounds is an Envelope, we convert to geometry
-                    var geometryFactory = new GeometryFactory();
-                    var planGeom = geometryFactory.ToGeometry(plan.Bounds);
-
-                    if (!constraints.BoundingPolygon.Contains(planGeom))
-                    {
-                        continue; // Filter out
-                    }
+                    continue;
                 }
 
                 result.Add(plan);
             }
             return result;
+        }
+
+        internal static bool IsPlanCompatible(Plan plan, Polygon boundingPolygon)
+        {
+            if (boundingPolygon == null) return true;
+
+            // Check if plan bounds are within polygon
+            // Since plan.Bounds is an Envelope, we convert to geometry
+            var geometryFactory = new GeometryFactory();
+            var planGeom = geometryFactory.ToGeometry(plan.Bounds);
+
+            // Fast check: if AABB is contained, we are good.
+            if (boundingPolygon.Contains(planGeom))
+            {
+                return true;
+            }
+
+            // Fallback: Precise check using actual geometries
+            // If the AABB doesn't fit (e.g. rotated plan), check if all individual geometries fit
+            bool allInside = true;
+            foreach (var kvp in plan.Geometries)
+            {
+                foreach (var geom in kvp.Value)
+                {
+                    // Use Covers instead of Contains to allow boundary contact
+                    if (!boundingPolygon.Covers(geom))
+                    {
+                        allInside = false;
+                        break;
+                    }
+                }
+                if (!allInside) break;
+            }
+
+            return allInside;
         }
 
         private static Plan ConvertDataToPlan(ResPlanData data)
