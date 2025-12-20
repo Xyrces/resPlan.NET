@@ -8,6 +8,7 @@ namespace ResPlan.Library.PythonInfrastructure
     public static class PythonEnvManager
     {
         private const string VenvDir = ".venv";
+        private static readonly object _lock = new object();
 
         public static string GetVenvPath()
         {
@@ -38,17 +39,20 @@ namespace ResPlan.Library.PythonInfrastructure
 
         public static void EnsureDependencies(Action<string> logger = null)
         {
-            var venvPath = GetVenvPath();
-            var pythonPath = GetPythonPath(venvPath);
-
-            if (!Directory.Exists(venvPath) || !File.Exists(pythonPath))
+            lock (_lock)
             {
-                logger?.Invoke("Creating Python virtual environment...");
-                CreateVenv(venvPath, logger);
-            }
+                var venvPath = GetVenvPath();
+                var pythonPath = GetPythonPath(venvPath);
 
-            logger?.Invoke("Installing dependencies...");
-            InstallDependencies(venvPath, logger);
+                if (!Directory.Exists(venvPath) || !File.Exists(pythonPath))
+                {
+                    logger?.Invoke("Creating Python virtual environment...");
+                    CreateVenv(venvPath, logger);
+                }
+
+                logger?.Invoke("Installing dependencies...");
+                InstallDependencies(venvPath, logger);
+            }
         }
 
         public static string GetPythonPath(string venvPath)

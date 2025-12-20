@@ -11,6 +11,7 @@ graph TD
     subgraph DotNet ["ResPlan.Library (.NET)"]
         PL[PlanLoader]
         GG[GraphGenerator]
+        BG[BuildingGenerator]
         PR[PlanRenderer]
         Models[Data Models]
         PEM[PythonEnvManager]
@@ -32,6 +33,7 @@ graph TD
     Wrapper -->|Streams JSON| PL
     PL -->|Deserializes to| Models
     GG -->|Consumes| Models
+    BG -->|Consumes & Produces| Models
     PR -->|Consumes| Models
     PL -.->|Manages| PEM
     PEM -.->|Configures| Venv
@@ -119,10 +121,17 @@ classDiagram
     Graph "1" *-- "*" Node
     Graph "1" *-- "*" Edge
     Node "1" o-- "1" Geometry
+    Building "1" *-- "*" BuildingFloor
+    BuildingFloor "1" o-- "1" Plan
 ```
 
 ### Type Definitions
 
+*   **`Building`**: Represents a multi-story structure.
+    *   `Floors`: A list of `BuildingFloor` objects sorted by floor number.
+*   **`BuildingFloor`**: A single floor in a building.
+    *   `Plan`: The floorplan associated with this level.
+    *   `AdditionalGeometries`: Generated common areas (e.g., stairs, corridors) not present in the original plan.
 *   **`Plan`**: The root object representing a single floorplan.
     *   `Geometries`: A dictionary mapping category names (e.g., "living", "wall", "door") to lists of NetTopologySuite `Geometry` objects.
     *   `Bounds`: The spatial bounding box of the plan.
@@ -181,18 +190,35 @@ Generates connectivity graphs from `Plan` geometries.
         *   Connects rooms via "door" or "window" geometries.
     *   **Returns**: A new `Graph` object.
 
+## Building Generation
+
+### `ResPlan.Library.BuildingGenerator`
+
+Procedurally generates multi-story buildings from a set of available plans.
+
+*   `Building GenerateBuilding(List<Plan> availablePlans, int targetFloors)`
+    *   Stacks plans to form a coherent building structure.
+    *   **Algorithm**:
+        1.  **Normalization**: All candidate plans are translated so their "front door" is at (0,0).
+        2.  **Sorting**: Plans are sorted by bounding box area (largest first).
+        3.  **Stacking**:
+            *   Floor 0 is the largest available plan.
+            *   Subsequent floors are chosen from the remaining plans such that they "fit" within the previous floor's footprint (checking geometric containment > 95%).
+            *   The generator attempts 4 cardinal rotations (0, 90, 180, 270 degrees) to find the best fit.
+        4.  **Stairs**: A "stair core" geometry (4x3m) is automatically generated adjacent to the front door for vertical circulation.
+    *   **Returns**: A `Building` object containing the stacked floors.
+
 ### `ResPlan.Library.PlanRenderer`
 
 Visualizes plans using SkiaSharp.
 
 *   `static void Render(Plan plan, string outputPath, int width = 800, int height = 800)`
-    *   **plan**: The plan to render.
-    *   **outputPath**: File path for the resulting PNG image.
-    *   **width/height**: Dimensions of the output image.
+    *   Renders a single `Plan`.
+*   `static void RenderFloor(BuildingFloor floor, string outputPath, int width = 800, int height = 800)`
+    *   **floor**: The `BuildingFloor` to render.
     *   **Details**:
-        *   Automatically scales the plan to fit the image dimensions.
-        *   Uses a predefined color palette for different room types.
-        *   Renders polygons with fills and strokes.
+        *   Combines the `Plan` geometries with `AdditionalGeometries` (e.g., stairs).
+        *   Renders "stairs" in a distinct color (DarkBlue).
 
 ## Testing
 
