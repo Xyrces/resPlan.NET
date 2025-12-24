@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.IO;
 using NetTopologySuite.Geometries;
 using SkiaSharp;
 
@@ -27,48 +28,6 @@ namespace ResPlan.Library
         {
             "living", "bedroom", "bathroom", "kitchen", "door", "window", "wall", "front_door", "balcony", "stairs"
         };
-
-        public static void RenderFloor(BuildingFloor floor, string outputPath, int width = 800, int height = 800)
-        {
-             // Create a composite plan for rendering
-             // We can shallow copy the plan logic
-             // But Render takes a Plan.
-             // We can create a temporary Plan object that merges Geometries + AdditionalGeometries
-
-             // Create a composite plan for rendering
-             // We use deep copy of the lists to avoid mutating the original plan
-             var compositePlan = new Plan
-             {
-                 Id = floor.Plan.Id,
-                 Geometries = new Dictionary<string, List<Geometry>>(),
-                 Bounds = new Envelope(floor.Plan.Bounds)
-             };
-
-             foreach(var kvp in floor.Plan.Geometries)
-             {
-                 compositePlan.Geometries[kvp.Key] = new List<Geometry>(kvp.Value);
-             }
-
-             foreach(var kvp in floor.AdditionalGeometries)
-             {
-                 if(compositePlan.Geometries.ContainsKey(kvp.Key))
-                 {
-                     compositePlan.Geometries[kvp.Key].AddRange(kvp.Value);
-                 }
-                 else
-                 {
-                     compositePlan.Geometries[kvp.Key] = new List<Geometry>(kvp.Value);
-                 }
-
-                 // Expand bounds
-                 foreach(var g in kvp.Value)
-                 {
-                     compositePlan.Bounds.ExpandToInclude(g.EnvelopeInternal);
-                 }
-             }
-
-             Render(compositePlan, outputPath, width, height);
-        }
 
         public static void Render(Plan plan, string outputPath, int width = 800, int height = 800)
         {

@@ -12,32 +12,38 @@ namespace ResPlan.Demo
             try
             {
                 Console.WriteLine("ResPlan Demo");
-                Console.WriteLine("Generating Multi-Story Building...");
+                Console.WriteLine("Loading Floor Plans...");
 
-                var plans = await PlanLoader.LoadPlansAsync(maxItems: 50);
+                var plans = await PlanLoader.LoadPlansAsync(maxItems: 5);
                 if (plans.Count == 0)
                 {
                     Console.WriteLine("No plans loaded.");
                     return;
                 }
 
-                var generator = new BuildingGenerator();
-                var building = generator.GenerateBuilding(plans, 3);
+                Console.WriteLine($"Loaded {plans.Count} plans.");
 
-                Console.WriteLine($"Generated Building with {building.Floors.Count} floors.");
-
-                // Render each floor
                 string outputDir = "output";
                 if (!Directory.Exists(outputDir))
                 {
                     Directory.CreateDirectory(outputDir);
                 }
 
-                foreach (var floor in building.Floors)
+                foreach (var plan in plans)
                 {
-                    string filename = Path.Combine(outputDir, $"floor_{floor.FloorNumber}.png");
-                    PlanRenderer.RenderFloor(floor, filename);
-                    Console.WriteLine($"Rendered {filename}");
+                    string filename = Path.Combine(outputDir, $"plan_{plan.Id}.png");
+                    PlanRenderer.Render(plan, filename);
+                    Console.WriteLine($"Rendered Plan {plan.Id} to {filename}");
+
+                    var entrance = plan.GetEntrance();
+                    if (entrance != null)
+                    {
+                        Console.WriteLine($"  Plan {plan.Id} Entrance: {entrance}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"  Plan {plan.Id} has no entrance.");
+                    }
                 }
 
                 Console.WriteLine("Done.");
