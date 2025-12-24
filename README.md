@@ -45,7 +45,7 @@ Console.WriteLine($"Loaded {plans.Count} plans.");
 
 ### 2. Applying Constraints (Optional)
 
-You can filter and orient plans using `PlanGenerationConstraints`.
+You can filter plans using `PlanGenerationConstraints`.
 
 ```csharp
 using NetTopologySuite.Geometries;
@@ -66,10 +66,7 @@ var boundingPoly = new GeometryFactory().CreatePolygon(coordinates);
 var constraints = new PlanGenerationConstraints
 {
     // Filter: Plan must fit inside this polygon
-    BoundingPolygon = boundingPoly,
-
-    // Orientation: Rotate plan so the front door faces "Up" (positive Y)
-    FrontDoorFacing = new Vector2(0, 1)
+    BoundingPolygon = boundingPoly
 };
 
 var constrainedPlans = await PlanLoader.LoadPlansAsync(
@@ -121,32 +118,7 @@ foreach (var plan in plans)
 }
 ```
 
-### 5. Multi-Story Building Generation
-
-You can generate multi-story buildings by stacking compatible floor plans using `BuildingGenerator`.
-
-```csharp
-using ResPlan.Library;
-
-// 1. Load a pool of plans (load enough to find good matches)
-var plans = await PlanLoader.LoadPlansAsync(maxItems: 50, logger: logger);
-
-// 2. Generate a building
-var generator = new BuildingGenerator();
-// Attempt to stack 3 floors using the available plans
-Building building = generator.GenerateBuilding(plans, targetFloors: 3);
-
-Console.WriteLine($"Generated building with {building.Floors.Count} floors.");
-
-// 3. Render each floor (including generated stairs)
-foreach (var floor in building.Floors)
-{
-    // RenderFloor visualizes the plan plus additional geometries (e.g., stairs)
-    PlanRenderer.RenderFloor(floor, $"building_floor_{floor.FloorNumber}.png");
-}
-```
-
-### 6. Serialization
+### 5. Serialization
 
 To support binary serialization and handle special floating-point values (like `NaN` or `Infinity`) which are not standard in JSON, the library provides a helper class `PlanSerializer` using **MessagePack**.
 

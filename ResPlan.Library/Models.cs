@@ -4,7 +4,6 @@ using System.Linq;
 using System.Text.Json.Serialization;
 using MessagePack;
 using NetTopologySuite.Geometries;
-using NetTopologySuite.Geometries.Utilities;
 using ResPlan.Library.Data;
 
 namespace ResPlan.Library
@@ -56,17 +55,24 @@ namespace ResPlan.Library
 
         public Coordinate GetEntrance()
         {
+            List<Geometry> candidates = null;
+
             if (Geometries.TryGetValue("front_door", out var doors) && doors.Any())
             {
-                // Return the centroid of the first front door
-                var door = doors.First();
-                return door.Centroid.Coordinate;
+                candidates = doors;
             }
             else if (Geometries.TryGetValue("entrance", out var entrances) && entrances.Any())
             {
-                 var entrance = entrances.First();
-                 return entrance.Centroid.Coordinate;
+                 candidates = entrances;
             }
+
+            if (candidates != null && candidates.Count > 0)
+            {
+                // Sort deterministically by Centroid X then Y
+                var sorted = candidates.OrderBy(g => g.Centroid.X).ThenBy(g => g.Centroid.Y).ToList();
+                return sorted[0].Centroid.Coordinate;
+            }
+
             return null;
         }
     }

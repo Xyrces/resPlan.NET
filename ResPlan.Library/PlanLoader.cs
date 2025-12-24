@@ -116,15 +116,6 @@ namespace ResPlan.Library
         {
             if (constraints == null) return plans;
 
-            if (constraints.GarageFacing.HasValue)
-            {
-                logger?.Invoke("Warning: Garage/Driveway facing constraints are not supported by the current ResPlan dataset.");
-            }
-            if (constraints.FrontDoorFacing.HasValue)
-            {
-                 logger?.Invoke("Warning: FrontDoorFacing constraint is no longer supported in PlanLoader. Consumers should handle orientation.");
-            }
-
             var result = new List<Plan>();
             foreach (var plan in plans)
             {
