@@ -4,7 +4,6 @@ using System.Linq;
 using System.Text.Json.Serialization;
 using MessagePack;
 using NetTopologySuite.Geometries;
-using NetTopologySuite.Geometries.Utilities;
 using ResPlan.Library.Data;
 
 namespace ResPlan.Library
@@ -54,59 +53,27 @@ namespace ResPlan.Library
         [Key(3)]
         public Graph ReferenceGraph { get; set; }
 
-        public void Rotate(double angleRadians, Coordinate center)
+        public Coordinate GetEntrance()
         {
-            var transform = new AffineTransformation();
-            transform.Rotate(angleRadians, center.X, center.Y);
+            List<Geometry> candidates = null;
 
-            ApplyTransformation(transform);
-        }
-
-        public void Translate(double dx, double dy)
-        {
-            var transform = new AffineTransformation();
-            transform.Translate(dx, dy);
-
-            ApplyTransformation(transform);
-        }
-
-        private void ApplyTransformation(AffineTransformation transform)
-        {
-            // Transform geometries
-            foreach (var key in Geometries.Keys.ToList())
+            if (Geometries.TryGetValue("front_door", out var doors) && doors.Any())
             {
-                var originalList = Geometries[key];
-                var newList = new List<Geometry>();
-                foreach (var geom in originalList)
-                {
-                    var newGeom = transform.Transform(geom);
-                    newList.Add(newGeom);
-                }
-                Geometries[key] = newList;
+                candidates = doors;
+            }
+            else if (Geometries.TryGetValue("entrance", out var entrances) && entrances.Any())
+            {
+                 candidates = entrances;
             }
 
-            // Update Bounds
-            var newEnvelope = new Envelope();
-            foreach (var list in Geometries.Values)
+            if (candidates != null && candidates.Count > 0)
             {
-                foreach (var geom in list)
-                {
-                    newEnvelope.ExpandToInclude(geom.EnvelopeInternal);
-                }
+                // Sort deterministically by Centroid X then Y
+                var sorted = candidates.OrderBy(g => g.Centroid.X).ThenBy(g => g.Centroid.Y).ToList();
+                return sorted[0].Centroid.Coordinate;
             }
-            Bounds = newEnvelope;
 
-            // Transform Graph Nodes
-            if (ReferenceGraph != null && ReferenceGraph.Nodes != null)
-            {
-                foreach (var node in ReferenceGraph.Nodes.Values)
-                {
-                    if (node.Geometry != null)
-                    {
-                        node.Geometry = transform.Transform(node.Geometry);
-                    }
-                }
-            }
+            return null;
         }
     }
 
@@ -141,43 +108,5 @@ namespace ResPlan.Library
         public string TargetId { get; set; }
         [Key(2)]
         public string Type { get; set; }
-    }
-
-    /// <summary>
-    /// Represents a multi-story building composed of stacked floor plans.
-    /// </summary>
-    [MessagePackObject]
-    public class Building
-    {
-        /// <summary>
-        /// The list of floors in the building, typically ordered by floor number.
-        /// </summary>
-        [Key(0)]
-        public List<BuildingFloor> Floors { get; set; } = new List<BuildingFloor>();
-    }
-
-    /// <summary>
-    /// Represents a single floor within a building.
-    /// </summary>
-    [MessagePackObject]
-    public class BuildingFloor
-    {
-        /// <summary>
-        /// The 0-based index of the floor.
-        /// </summary>
-        [Key(0)]
-        public int FloorNumber { get; set; }
-
-        /// <summary>
-        /// The floor plan associated with this level.
-        /// </summary>
-        [Key(1)]
-        public Plan Plan { get; set; }
-
-        /// <summary>
-        /// Additional geometries generated for this floor (e.g., stairs, corridors) that are not part of the original plan.
-        /// </summary>
-        [Key(2)]
-        public Dictionary<string, List<Geometry>> AdditionalGeometries { get; set; } = new Dictionary<string, List<Geometry>>();
     }
 }

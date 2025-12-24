@@ -20,8 +20,6 @@ namespace ResPlan.Library
         {
             if (!string.IsNullOrEmpty(jsonPath) && File.Exists(jsonPath))
             {
-                // In this path, we don't apply constraints inside LoadPlansFromJson for now, or we should?
-                // The prompt says "When using the API". It's better to be consistent.
                 var loaded = LoadPlansFromJson(jsonPath);
                 return ApplyConstraints(loaded, constraints, logger);
             }
@@ -72,9 +70,6 @@ namespace ResPlan.Library
                 UseShellExecute = false
             };
 
-            // Set environment to use the venv?
-            // Invoking the python binary in venv/bin/python3 sets up sys.path correctly automatically.
-
             using (var p = Process.Start(psi))
             {
                 var stdout = await p.StandardOutput.ReadToEndAsync();
@@ -87,10 +82,6 @@ namespace ResPlan.Library
                 }
 
                 // Parse stdout as JSON
-                // The script should output JSON.
-                // We might need to filter stdout if there are prints.
-                // The wrapper script should avoid prints.
-
                 var options = new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true,
@@ -125,55 +116,9 @@ namespace ResPlan.Library
         {
             if (constraints == null) return plans;
 
-            if (constraints.GarageFacing.HasValue)
-            {
-                logger?.Invoke("Warning: Garage/Driveway facing constraints are not supported by the current ResPlan dataset.");
-            }
-
             var result = new List<Plan>();
             foreach (var plan in plans)
             {
-                // Apply Facing Constraint
-                if (constraints.FrontDoorFacing.HasValue)
-                {
-                    // Find front door
-                    Geometry frontDoor = null;
-                    if (plan.Geometries.ContainsKey("front_door"))
-                    {
-                        var fds = plan.Geometries["front_door"];
-                        if (fds.Count > 0)
-                        {
-                            // If multiple, pick first?
-                            frontDoor = fds[0];
-                        }
-                    }
-
-                    if (frontDoor != null)
-                    {
-                        var centroid = frontDoor.Centroid.Coordinate;
-                        var planCenter = plan.Bounds.Centre; // Envelope center
-
-                        // Vector from plan center to door center
-                        var currentVec = new NetTopologySuite.Geometries.Coordinate(centroid.X - planCenter.X, centroid.Y - planCenter.Y);
-
-                        // If center and door are same (rare), skip
-                        if (Math.Abs(currentVec.X) > 1e-6 || Math.Abs(currentVec.Y) > 1e-6)
-                        {
-                            var targetX = constraints.FrontDoorFacing.Value.X;
-                            var targetY = constraints.FrontDoorFacing.Value.Y;
-
-                            // Angle of current vector
-                            var currentAngle = Math.Atan2(currentVec.Y, currentVec.X);
-                            // Angle of target
-                            var targetAngle = Math.Atan2(targetY, targetX);
-
-                            var diff = targetAngle - currentAngle;
-
-                            plan.Rotate(diff, planCenter);
-                        }
-                    }
-                }
-
                 // Apply Bounding Constraint
                 if (!IsPlanCompatible(plan, constraints.BoundingPolygon))
                 {
