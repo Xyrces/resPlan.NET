@@ -76,7 +76,26 @@ var constrainedPlans = await PlanLoader.LoadPlansAsync(
 );
 ```
 
-### 3. Generating Connectivity Graphs
+### 3. Vertical Anchors (Semantic Data)
+
+Plans now expose semantic data to assist with vertical stacking and alignment in 3D generation contexts. The `GetVerticalAnchors()` method returns geometries that serve as optimal connection points between floors (e.g., stairs, elevators, or central corridors).
+
+```csharp
+using ResPlan.Library;
+
+foreach (var plan in plans)
+{
+    var anchors = plan.GetVerticalAnchors();
+    Console.WriteLine($"Plan {plan.Id} has {anchors.Count} vertical anchors.");
+
+    foreach (var anchor in anchors)
+    {
+        Console.WriteLine($"  - Anchor at {anchor.Centroid}");
+    }
+}
+```
+
+### 4. Generating Connectivity Graphs
 
 Once a `Plan` is loaded, you can generate a graph representing the connectivity between rooms, doors, and windows using `GraphGenerator`.
 
@@ -100,7 +119,7 @@ foreach (var plan in plans)
 }
 ```
 
-### 4. Rendering Floorplans
+### 5. Rendering Floorplans
 
 You can visualize the floorplan using `PlanRenderer`. This uses SkiaSharp to produce an image file.
 
@@ -118,7 +137,7 @@ foreach (var plan in plans)
 }
 ```
 
-### 5. Serialization
+### 6. Serialization
 
 To support binary serialization and handle special floating-point values (like `NaN` or `Infinity`) which are not standard in JSON, the library provides a helper class `PlanSerializer` using **MessagePack**.
 

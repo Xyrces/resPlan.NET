@@ -75,6 +75,49 @@ namespace ResPlan.Library
 
             return null;
         }
+
+        public List<Geometry> GetVerticalAnchors()
+        {
+            var anchors = new List<Geometry>();
+            var keys = new[] { "stairs", "elevator", "foyer" };
+
+            foreach (var key in keys)
+            {
+                if (Geometries.TryGetValue(key, out var geoms) && geoms != null)
+                {
+                    anchors.AddRange(geoms);
+                }
+            }
+
+            if (anchors.Any())
+            {
+                return anchors;
+            }
+
+            if (Geometries.TryGetValue("corridor", out var corridors) && corridors != null && corridors.Any())
+            {
+                if (Bounds != null)
+                {
+                    var center = Bounds.Centre;
+                    // Use the factory of the first corridor geometry to ensure compatibility
+                    var factory = corridors.First().Factory;
+                    var centerPoint = factory.CreatePoint(center);
+
+                    var closest = corridors.OrderBy(g => g.Distance(centerPoint)).FirstOrDefault();
+                    if (closest != null)
+                    {
+                        anchors.Add(closest);
+                    }
+                }
+                else
+                {
+                    // If no bounds, just take the first corridor as fallback
+                    anchors.Add(corridors.First());
+                }
+            }
+
+            return anchors;
+        }
     }
 
     [MessagePackObject]
