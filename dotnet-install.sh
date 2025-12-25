@@ -273,22 +273,27 @@ remove_beginning_slash() {
 }
 
 # args:
-# root_path - $1
-# child_path - $2 - this parameter can be empty
+# paths - arbitrary number of paths to combine
 combine_paths() {
     eval $invocation
 
-    # TODO: Consider making it work with any number of paths. For now:
-    if [ ! -z "${3:-}" ]; then
-        say_err "combine_paths: Function takes two parameters."
-        return 1
+    local path=""
+    if [ $# -gt 0 ]; then
+        path="$(remove_trailing_slash "$1")"
+        shift
     fi
 
-    local root_path="$(remove_trailing_slash "$1")"
-    local child_path="$(remove_beginning_slash "${2:-}")"
-    say_verbose "combine_paths: root_path=$root_path"
-    say_verbose "combine_paths: child_path=$child_path"
-    echo "$root_path/$child_path"
+    while [ $# -gt 0 ]; do
+        local segment="$(remove_beginning_slash "${1:-}")"
+        path="$path/$segment"
+        shift
+        if [ $# -gt 0 ]; then
+            path="$(remove_trailing_slash "$path")"
+        fi
+    done
+
+    say_verbose "combine_paths: result=$path"
+    echo "$path"
     return 0
 }
 
