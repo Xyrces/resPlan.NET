@@ -3,12 +3,20 @@ using System.IO;
 using System.Linq;
 using SkiaSharp;
 using Xunit;
+using Xunit.Abstractions;
 using ResPlan.Library;
 
 namespace ResPlan.Tests
 {
     public class ImageComparisonTests
     {
+        private readonly ITestOutputHelper _output;
+
+        public ImageComparisonTests(ITestOutputHelper output)
+        {
+            _output = output;
+        }
+
         [Fact]
         public void VerifyImageGenerationAgainstReference()
         {
@@ -27,11 +35,11 @@ namespace ResPlan.Tests
                 Assert.True(File.Exists(refPath), $"Reference image {refPath} not found.");
 
                 // Compare
-                CompareImages(refPath, actualPath);
+                CompareImages(refPath, actualPath, plan.Id);
             }
         }
 
-        private void CompareImages(string refPath, string actualPath)
+        private void CompareImages(string refPath, string actualPath, int planId)
         {
             using var refImg = SKBitmap.Decode(refPath);
             using var actImg = SKBitmap.Decode(actualPath);
@@ -62,6 +70,8 @@ namespace ResPlan.Tests
             double mse = diffSum / (double)(pixelCount * 3);
             double rmse = Math.Sqrt(mse);
 
+            _output.WriteLine($"Plan {planId} Comparison: RMSE = {rmse:F2}");
+
             // Define a tolerance. 0 is perfect.
             // Given font rendering, anti-aliasing differences, etc.
             // 255 is max difference.
@@ -86,7 +96,7 @@ namespace ResPlan.Tests
             // So axes are off. Background should be white.
 
             // Let's assert RMSE < 20.
-            Assert.True(rmse < 50, $"Image mismatch for {refPath}. RMSE: {rmse}");
+            Assert.True(rmse < 20, $"Image mismatch for {refPath}. RMSE: {rmse}");
         }
 
         private long Sq(int x) => x * x;
