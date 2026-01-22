@@ -11,7 +11,7 @@ This library is a .NET port/adaptation of the original Python implementation, de
 
 ## Installation
 
-Add a reference to the `ResPlan.Library` project or install the NuGet package (if available).
+Add a reference to the `ResPlan.Library` project or install the `ResPlan.NET` NuGet package.
 
 ## Quick Start
 
