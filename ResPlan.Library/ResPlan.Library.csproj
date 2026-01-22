@@ -4,7 +4,7 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <PackageId>ResPlan.Library</PackageId>
+    <PackageId>ResPlan.NET</PackageId>
     <Authors>ResPlan Contributors</Authors>
     <Company>ResPlan</Company>
     <Product>ResPlan</Product>
