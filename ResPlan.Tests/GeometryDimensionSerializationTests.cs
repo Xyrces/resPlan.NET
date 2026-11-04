@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using MessagePack;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.Geometries.Implementation;
@@ -129,6 +130,87 @@ public class GeometryDimensionSerializationTests
         AssertGeometryEqual(source, result);
     }
 
+    public static IEnumerable<object[]> ExplicitChildSridCases()
+    {
+        foreach (int parentSrid in new[] { 4326, 0 })
+            foreach (int childSrid in new[] { -1, -2, 0, 3857 })
+                foreach (var (kind, empty) in new[]
+                {
+                    ("Point", false), ("LineString", false), ("Polygon", false),
+                    ("Point", true), ("Polygon", true)
+                })
+                    yield return new object[] { parentSrid, childSrid, kind, empty };
+    }
+
+    [Theory]
+    [MemberData(nameof(ExplicitChildSridCases))]
+    public void ExplicitChildSridOverridesTheParentEvenWhenNegative(
+        int parentSrid, int childSrid, string kind, bool empty)
+    {
+        var parentFactory = new GeometryFactory(new PrecisionModel(), parentSrid);
+        Geometry child = CreateGeometry(kind, 3, 1, empty, childSrid);
+        GeometryCollection source = parentFactory.CreateGeometryCollection(new[] { child });
+
+        GeometryCollection roundTrip = MessagePackSerializer.Deserialize<GeometryCollection>(
+            MessagePackSerializer.Serialize(source, ResPlanMessagePackResolver.Options),
+            ResPlanMessagePackResolver.Options);
+        AssertGeometryEqual(source, roundTrip);
+
+        foreach (ByteOrder byteOrder in new[] { ByteOrder.LittleEndian, ByteOrder.BigEndian })
+        {
+            // Build the collection envelope independently; the child always has
+            // an explicit SRID field, including -1, -2 and zero.
+            byte[] wkb = CollectionWkb(byteOrder, parentSrid,
+                XymWkb(child, byteOrder, includeSrid: true));
+            GeometryCollection decoded = MessagePackSerializer.Deserialize<GeometryCollection>(
+                MessagePackSerializer.Serialize(wkb), ResPlanMessagePackResolver.Options);
+            AssertGeometryEqual(source, decoded);
+        }
+    }
+
+    [Theory]
+    [InlineData(4326, -1)]
+    [InlineData(4326, -2)]
+    [InlineData(0, -1)]
+    [InlineData(0, -2)]
+    public void NestedNegativeSridIsInheritedUntilAnotherExplicitOverride(int parentSrid, int nestedSrid)
+    {
+        var parentFactory = new GeometryFactory(new PrecisionModel(), parentSrid);
+        var nestedFactory = new GeometryFactory(new PrecisionModel(), nestedSrid);
+        Geometry inheritedPoint = CreateGeometry("Point", 3, 1, empty: false, nestedSrid);
+        Geometry inheritedEmptyPolygon = CreateGeometry("Polygon", 3, 1, empty: true, nestedSrid);
+        Geometry zeroOverride = CreateGeometry("LineString", 3, 1, empty: false, srid: 0);
+        Geometry inheritedEmptyPoint = CreateGeometry("Point", 3, 1, empty: true, nestedSrid);
+        Geometry inheritedPolygon = CreateGeometry("Polygon", 3, 1, empty: false, nestedSrid);
+        GeometryCollection inner = nestedFactory.CreateGeometryCollection(
+            new[] { inheritedEmptyPoint, inheritedPolygon });
+        GeometryCollection nested = nestedFactory.CreateGeometryCollection(
+            new[] { inheritedPoint, inheritedEmptyPolygon, zeroOverride, inner });
+        GeometryCollection source = parentFactory.CreateGeometryCollection(new Geometry[] { nested });
+
+        GeometryCollection roundTrip = MessagePackSerializer.Deserialize<GeometryCollection>(
+            MessagePackSerializer.Serialize(source, ResPlanMessagePackResolver.Options),
+            ResPlanMessagePackResolver.Options);
+        AssertGeometryEqual(source, roundTrip);
+
+        foreach (ByteOrder byteOrder in new[] { ByteOrder.LittleEndian, ByteOrder.BigEndian })
+        {
+            // Only the nested collection declares the negative SRID. Its children,
+            // and the next collection level, must inherit that signed value.
+            byte[] wkb = CollectionWkb(byteOrder, parentSrid,
+                CollectionWkb(byteOrder, nestedSrid,
+                    XymWkb(inheritedPoint, byteOrder, includeSrid: false),
+                    XymWkb(inheritedEmptyPolygon, byteOrder, includeSrid: false),
+                    XymWkb(zeroOverride, byteOrder, includeSrid: true),
+                    CollectionWkb(byteOrder, null,
+                        XymWkb(inheritedEmptyPoint, byteOrder, includeSrid: false),
+                        XymWkb(inheritedPolygon, byteOrder, includeSrid: false))));
+            GeometryCollection decoded = MessagePackSerializer.Deserialize<GeometryCollection>(
+                MessagePackSerializer.Serialize(wkb), ResPlanMessagePackResolver.Options);
+            AssertGeometryEqual(source, decoded);
+        }
+    }
+
     [Theory]
     [InlineData("MultiPoint")]
     [InlineData("MultiLineString")]
@@ -191,6 +273,37 @@ public class GeometryDimensionSerializationTests
             MessagePackSerializer.Serialize(source, ResPlanMessagePackResolver.Options));
 
         Assert.Contains("every ring of a polygon", error.ToString(), StringComparison.Ordinal);
+    }
+
+    private static byte[] XymWkb(Geometry geometry, ByteOrder byteOrder, bool includeSrid)
+        => new WKBWriter(byteOrder, handleSRID: true, emitZ: false, emitM: true)
+        { HandleSRID = includeSrid }.Write(geometry);
+
+    private static byte[] CollectionWkb(ByteOrder byteOrder, int? srid, params byte[][] children)
+    {
+        // EWKB GeometryCollection header: byte order, type, optional signed SRID,
+        // child count, then independently encoded child geometries.
+        byte[] bytes = new byte[(srid.HasValue ? 13 : 9) + children.Sum(child => child.Length)];
+        bytes[0] = (byte)byteOrder;
+        int offset = 1;
+        WriteUInt32(7u | (srid.HasValue ? 0x20000000u : 0u));
+        if (srid.HasValue) WriteUInt32(unchecked((uint)srid.Value));
+        WriteUInt32((uint)children.Length);
+        foreach (byte[] child in children)
+        {
+            child.CopyTo(bytes, offset);
+            offset += child.Length;
+        }
+        return bytes;
+
+        void WriteUInt32(uint value)
+        {
+            if (byteOrder == ByteOrder.LittleEndian)
+                BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(offset), value);
+            else
+                BinaryPrimitives.WriteUInt32BigEndian(bytes.AsSpan(offset), value);
+            offset += sizeof(uint);
+        }
     }
 
     private static Geometry CreateGeometry(string kind, int dimension, int measures, bool empty, int srid = 4326)

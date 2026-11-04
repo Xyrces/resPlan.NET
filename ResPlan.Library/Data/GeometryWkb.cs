@@ -5,7 +5,7 @@ using NetTopologySuite.IO;
 
 namespace ResPlan.Library.Data;
 
-/// <summary>Retains per-geometry XY/Z/M schemas in the existing EWKB payload.</summary>
+/// <summary>Retains per-geometry XY/Z/M schemas and SRIDs in the existing EWKB payload.</summary>
 internal static class GeometryWkb
 {
     internal static byte[] Write(Geometry geometry)
@@ -79,16 +79,16 @@ internal static class GeometryWkb
         // Let NTS validate and decode WKB, including legacy byte order/SRID variants.
         var geometry = new WKBReader().Read(bytes);
         var cursor = new SchemaCursor(bytes);
-        return cursor.RestoreEmptySchemas(geometry);
+        return cursor.RestoreHeaders(geometry);
     }
 
-    // NTS 2.6 discards the header's schema when creating empty points/polygons.
-    // Walk the already-validated bytes alongside the decoded tree to restore it.
+    // NTS 2.6 discards empty point/polygon schemas and ignores negative EWKB SRIDs.
+    // Walk the already-validated bytes alongside the decoded tree to restore them.
     private ref struct SchemaCursor(ReadOnlySpan<byte> bytes)
     {
         private ReadOnlySpan<byte> remaining = bytes;
 
-        internal Geometry RestoreEmptySchemas(Geometry geometry)
+        internal Geometry RestoreHeaders(Geometry geometry, int? parentSrid = null)
         {
             var littleEndian = remaining[0] != (byte)ByteOrder.BigEndian;
             Skip(1);
@@ -101,25 +101,35 @@ internal static class GeometryWkb
                 ? isoDimension is 2 or 3 : (type & 0x40000000) != 0;
             var dimension = 2 + (hasZ ? 1 : 0) + (hasM ? 1 : 0);
             var measures = hasM ? 1 : 0;
-            if ((type & 0x20000000) != 0) Skip(4);
+            var srid = (type & 0x20000000) != 0
+                ? unchecked((int)ReadUInt32(littleEndian))
+                : parentSrid ?? geometry.SRID;
+            var factory = geometry.Factory.WithSRID(srid);
+            var changedSrid = geometry.SRID != srid;
 
             switch (geometry)
             {
                 case Point point:
                     Skip(dimension * sizeof(double));
                     return point.IsEmpty
-                        ? point.Factory.CreatePoint(point.Factory.CoordinateSequenceFactory.Create(0, dimension, measures))
-                        : point;
-                case LineString:
+                        ? factory.CreatePoint(factory.CoordinateSequenceFactory.Create(0, dimension, measures))
+                        : changedSrid ? factory.CreatePoint(point.CoordinateSequence) : point;
+                case LineString line:
                     SkipCoordinates(littleEndian, dimension);
-                    return geometry;
+                    return changedSrid ? factory.CreateLineString(line.CoordinateSequence) : line;
                 case Polygon polygon:
                     var rings = ReadUInt32(littleEndian);
                     for (uint index = 0; index < rings; index++) SkipCoordinates(littleEndian, dimension);
-                    return polygon.IsEmpty
-                        ? polygon.Factory.CreatePolygon(polygon.Factory.CreateLinearRing(
-                            polygon.Factory.CoordinateSequenceFactory.Create(0, dimension, measures)))
-                        : polygon;
+                    if (polygon.IsEmpty)
+                        return factory.CreatePolygon(factory.CreateLinearRing(
+                            factory.CoordinateSequenceFactory.Create(0, dimension, measures)));
+                    if (!changedSrid) return polygon;
+                    // Polygon.SRID does not update its rings; rebuild through the
+                    // restored factory so every ring inherits the polygon header.
+                    return factory.CreatePolygon(
+                        factory.CreateLinearRing(polygon.ExteriorRing.CoordinateSequence),
+                        Enumerable.Range(0, polygon.NumInteriorRings).Select(index =>
+                            factory.CreateLinearRing(polygon.GetInteriorRingN(index).CoordinateSequence)).ToArray());
                 case GeometryCollection collection:
                     var count = ReadUInt32(littleEndian);
                     if (count != collection.NumGeometries) throw new ParseException("WKB collection count differs from decoded geometry.");
@@ -127,20 +137,22 @@ internal static class GeometryWkb
                     for (var index = 0; index < collection.NumGeometries; index++)
                     {
                         var original = collection.GetGeometryN(index);
-                        var restored = RestoreEmptySchemas(original);
+                        var restored = RestoreHeaders(original, srid);
                         if (!ReferenceEquals(original, restored))
                         {
                             children ??= collection.Geometries.ToArray();
                             children[index] = restored;
                         }
                     }
-                    if (children is null) return collection;
+                    if (children is null && !changedSrid) return collection;
+                    children ??= collection.Geometries;
+                    // Setting collection.SRID would overwrite explicit child SRIDs.
                     return collection switch
                     {
-                        MultiPoint => collection.Factory.CreateMultiPoint(children.Cast<Point>().ToArray()),
-                        MultiLineString => collection.Factory.CreateMultiLineString(children.Cast<LineString>().ToArray()),
-                        MultiPolygon => collection.Factory.CreateMultiPolygon(children.Cast<Polygon>().ToArray()),
-                        _ => collection.Factory.CreateGeometryCollection(children)
+                        MultiPoint => factory.CreateMultiPoint(children.Cast<Point>().ToArray()),
+                        MultiLineString => factory.CreateMultiLineString(children.Cast<LineString>().ToArray()),
+                        MultiPolygon => factory.CreateMultiPolygon(children.Cast<Polygon>().ToArray()),
+                        _ => factory.CreateGeometryCollection(children)
                     };
                 default:
                     throw new ParseException($"Unsupported WKB geometry type '{geometry.GeometryType}'.");

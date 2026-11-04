@@ -11,12 +11,11 @@ internal static class ResPlanPickleRegistry
     internal static PickleRegistry Create()
     {
         var registry = new PickleRegistry();
-        // Each load owns its readers and registry; concurrent callers share no mutable decoder state.
-        var wkb = new WKBReader();
+        // Each load owns its registry; geometry decoding also uses a fresh reader.
         registry.Register<Geometry>("shapely.io", "from_wkb", (args, keywords) =>
         {
             RequireArguments(args, keywords, 1, 1, "shapely.io.from_wkb");
-            try { return wkb.Read(Bytes(args[0], "Shapely WKB")); }
+            try { return GeometryWkb.Read(Bytes(args[0], "Shapely WKB")); }
             catch (Exception exception) when (exception is ArgumentException or ParseException or EndOfStreamException)
             { throw new UnpicklingException("The Shapely constructor contains invalid WKB geometry.", exception); }
         });

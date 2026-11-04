@@ -48,6 +48,16 @@ versions. Expected endpoints resolve through Python key equality against the
 original node keys. NumPy ID spelling follows the pinned oracle version;
 metadata retains the exact widened numeric value separately from its ID.
 
+Empty Shapely Point and Polygon fixtures cover XY, XYZ, XYM, and XYZM schemas
+in stored graph nodes across protocols 0–5. Tests check dimensions, measures,
+and SRIDs both after native loading and after MessagePack round trips. Their
+manifest records the generator hash and Python, Shapely, GEOS, and NetworkX
+versions. Regenerate them with:
+
+```bash
+.venv/bin/python tools/generate_empty_geometry_fixtures.py
+```
+
 For the full trusted dataset, keep the large input and generated oracle outside
 the repository. The validated 17,000-plan `ResPlan.pkl` is 258,453,658 bytes with
 SHA-256 `103edd854a5f365aa875ed832e6cef0d8bc72c4b34e5df0856c01b6970684cb5`:
