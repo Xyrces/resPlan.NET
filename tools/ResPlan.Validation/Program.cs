@@ -263,7 +263,7 @@ internal static class Validation
         return value;
     }
 
-    private static void Compare(JsonElement expected, JsonElement actual, string path, ComparisonErrors errors,
+    internal static void Compare(JsonElement expected, JsonElement actual, string path, ComparisonErrors errors,
         string stage, double areaAbsolute, double areaRelative, ComparisonValue context = ComparisonValue.Plan)
     {
         if (expected.ValueKind != actual.ValueKind)
@@ -292,17 +292,16 @@ internal static class Validation
                         areaAbsolute, areaRelative, ComparisonValue.Normal);
                 break;
             case JsonValueKind.Number:
-                bool equal;
-                if (context == ComparisonValue.Area)
+                // Compare numeric JSON representations without decimal or double rounding.
+                var equal = JsonElement.DeepEquals(expected, actual);
+                if (!equal && context == ComparisonValue.Area && (areaAbsolute > 0 || areaRelative > 0))
                 {
                     var expectedNumber = expected.GetDouble();
                     var actualNumber = actual.GetDouble();
-                    equal = expectedNumber.Equals(actualNumber) || Math.Abs(expectedNumber - actualNumber)
+                    equal = double.IsFinite(expectedNumber) && double.IsFinite(actualNumber)
+                        && Math.Abs(expectedNumber - actualNumber)
                         <= areaAbsolute + areaRelative * Math.Max(Math.Abs(expectedNumber), Math.Abs(actualNumber));
                 }
-                else if (expected.TryGetDecimal(out var expectedDecimal) && actual.TryGetDecimal(out var actualDecimal))
-                    equal = expectedDecimal == actualDecimal;
-                else equal = expected.GetDouble().Equals(actual.GetDouble());
                 if (!equal) errors.Add(stage, $"{path}: expected {expected.GetRawText()}, actual {actual.GetRawText()}");
                 break;
             case JsonValueKind.String:
@@ -312,7 +311,7 @@ internal static class Validation
         }
     }
 
-    private enum ComparisonValue { Normal, Plan, Graph, Nodes, Node, Area }
+    internal enum ComparisonValue { Normal, Plan, Graph, Nodes, Node, Area }
 
     private static ComparisonValue ChildContext(ComparisonValue parent, string key) => parent switch
     {
@@ -323,7 +322,7 @@ internal static class Validation
         _ => ComparisonValue.Normal
     };
 
-    private sealed class ComparisonErrors
+    internal sealed class ComparisonErrors
     {
         internal long Count { get; private set; }
         internal Dictionary<string, long> CountByStage { get; } = new();

@@ -7,5 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../ResPlan.Library/ResPlan.Library.csproj" />
+    <InternalsVisibleTo Include="ResPlan.Tests" />
   </ItemGroup>
 </Project>

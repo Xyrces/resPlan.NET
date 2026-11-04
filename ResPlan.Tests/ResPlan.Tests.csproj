@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ResPlan.Library\ResPlan.Library.csproj" />
+    <ProjectReference Include="..\tools\ResPlan.Validation\ResPlan.Validation.csproj" />
   </ItemGroup>
 
   <ItemGroup>
