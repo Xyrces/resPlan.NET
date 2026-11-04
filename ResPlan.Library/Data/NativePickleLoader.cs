@@ -197,10 +197,46 @@ internal static class NativePickleLoader
         string text => text,
         bool boolean => boolean ? "True" : "False",
         null => "None",
-        sbyte or byte or short or ushort or int or uint or long or ulong or float or double or BigInteger
+        float number => FormatPythonFloat(number),
+        double number => FormatPythonFloat(number),
+        sbyte or byte or short or ushort or int or uint or long or ulong or BigInteger
             => Convert.ToString(value, CultureInfo.InvariantCulture)!,
         _ => throw new InvalidDataException($"Unsupported NetworkX identifier type '{value.GetType().Name}'.")
     };
+
+    private static string FormatPythonFloat(double value)
+    {
+        if (double.IsNaN(value)) return "nan";
+        if (double.IsPositiveInfinity(value)) return "inf";
+        if (double.IsNegativeInfinity(value)) return "-inf";
+        var sign = double.IsNegative(value) ? "-" : "";
+        if (value == 0) return sign + "0.0";
+
+        // Retain the shortest round-trip digits, but apply Python str(float)'s
+        // notation thresholds, exponent spelling, and mandatory .0 for integers.
+        var text = Math.Abs(value).ToString("R", CultureInfo.InvariantCulture);
+        var exponentIndex = text.IndexOf('E');
+        var exponent = exponentIndex < 0 ? 0 : int.Parse(text.AsSpan(exponentIndex + 1), CultureInfo.InvariantCulture);
+        var significand = exponentIndex < 0 ? text : text[..exponentIndex];
+        var point = significand.IndexOf('.');
+        var digits = significand.Replace(".", "", StringComparison.Ordinal);
+        var leadingZeros = digits.Length - digits.TrimStart('0').Length;
+        var decimalPosition = (point < 0 ? significand.Length : point) + exponent - leadingZeros;
+        digits = digits[leadingZeros..].TrimEnd('0');
+        exponent = decimalPosition - 1;
+
+        if (exponent is < -4 or >= 16)
+        {
+            var mantissa = digits.Length == 1 ? digits : digits.Insert(1, ".");
+            return sign + mantissa + "e" + (exponent < 0 ? "-" : "+")
+                + Math.Abs(exponent).ToString("D2", CultureInfo.InvariantCulture);
+        }
+        if (decimalPosition <= 0)
+            return sign + "0." + new string('0', -decimalPosition) + digits;
+        if (decimalPosition >= digits.Length)
+            return sign + digits + new string('0', decimalPosition - digits.Length) + ".0";
+        return sign + digits.Insert(decimalPosition, ".");
+    }
 
     private static double Number(object? value, string name) => value switch
     {
