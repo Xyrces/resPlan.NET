@@ -1,7 +1,6 @@
 using MessagePack;
 using MessagePack.Formatters;
 using NetTopologySuite.Geometries;
-using NetTopologySuite.IO;
 using System.Buffers;
 
 namespace ResPlan.Library.Data
@@ -21,9 +20,8 @@ namespace ResPlan.Library.Data
                 return;
             }
 
-            // Keep the existing binary representation, using EWKB to retain SRID,
-            // elevation and measure values. NTS codecs are not thread-safe.
-            var bytes = new WKBWriter(ByteOrder.LittleEndian, handleSRID: true, emitZ: true, emitM: true).Write(value);
+            // Retain SRID and the actual per-component coordinate schemas in EWKB.
+            var bytes = GeometryWkb.Write(value);
             writer.Write(bytes);
         }
 
@@ -38,7 +36,7 @@ namespace ResPlan.Library.Data
             if (bytes == null) return null;
 
             // WKBReader accepts both legacy two-dimensional WKB and EWKB.
-            Geometry geometry = new WKBReader().Read(bytes.Value.ToArray());
+            Geometry geometry = GeometryWkb.Read(bytes.Value.ToArray());
             // WKB represents a standalone LinearRing as a LineString. Its declared
             // managed type supplies the missing distinction when reading a ring.
             if (typeof(TGeometry) == typeof(LinearRing) && geometry is LineString line)

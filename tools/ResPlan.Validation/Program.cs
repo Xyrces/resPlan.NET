@@ -70,6 +70,9 @@ internal static class Validation
                     var restoredSnapshot = JsonSerializer.SerializeToElement(PlanSnapshot(restored), JsonOptions);
                     // Serialization must retain the exact numeric values, including areas.
                     Compare(snapshot, restoredSnapshot, $"plans[{index}]", errors, "messagepack", 0, 0);
+                    // The Python oracle intentionally hashes 2D WKB. Check the complete NTS
+                    // geometry schema separately so that dimension or SRID changes cannot hide.
+                    ComparePlanGeometries(plan, restored, $"plans[{index}]", errors);
                 }
                 catch (Exception exception)
                 {
@@ -162,6 +165,82 @@ internal static class Validation
 
     private static string? GeometryHash(Geometry? geometry) => geometry is null ? null
         : Convert.ToHexStringLower(SHA256.HashData(GeometryWriter.Write(geometry)));
+
+    private static void ComparePlanGeometries(Plan expected, Plan actual, string path, ComparisonErrors errors)
+    {
+        // Missing layers, nodes, and geometry parts are already reported by Compare above.
+        foreach (var (layer, parts) in expected.Geometries)
+            if (actual.Geometries.TryGetValue(layer, out var restoredParts))
+                for (var index = 0; index < Math.Min(parts.Count, restoredParts.Count); index++)
+                    CompareGeometry(parts[index], restoredParts[index], $"{path}.geometries[{layer}][{index}]", errors);
+        CompareGraphGeometries(expected.ReferenceGraph, actual.ReferenceGraph, path + ".reference_graph", errors);
+        CompareGraphGeometries(expected.SourceGraph, actual.SourceGraph, path + ".source_graph", errors);
+    }
+
+    private static void CompareGraphGeometries(Graph? expected, Graph? actual, string path, ComparisonErrors errors)
+    {
+        if (expected is null || actual is null) return;
+        foreach (var (id, node) in expected.Nodes)
+            if (actual.Nodes.TryGetValue(id, out var restoredNode))
+                CompareGeometry(node.Geometry, restoredNode.Geometry, $"{path}.nodes[{id}].geometry", errors);
+    }
+
+    private static void CompareGeometry(Geometry? expected, Geometry? actual, string path, ComparisonErrors errors)
+    {
+        if (expected is null || actual is null)
+        {
+            if (expected is not null || actual is not null)
+                errors.Add("messagepack", $"{path}: geometry nullability changed");
+            return;
+        }
+        if (expected.GeometryType != actual.GeometryType)
+        {
+            errors.Add("messagepack", $"{path}: expected {expected.GeometryType}, actual {actual.GeometryType}");
+            return;
+        }
+        if (expected.SRID != actual.SRID)
+            errors.Add("messagepack", $"{path}.srid: expected {expected.SRID}, actual {actual.SRID}");
+        switch (expected)
+        {
+            case Point point:
+                CompareCoordinates(point.CoordinateSequence, ((Point)actual).CoordinateSequence, path, errors);
+                break;
+            case LineString line:
+                CompareCoordinates(line.CoordinateSequence, ((LineString)actual).CoordinateSequence, path, errors);
+                break;
+            case Polygon polygon:
+                var restoredPolygon = (Polygon)actual;
+                CompareGeometry(polygon.ExteriorRing, restoredPolygon.ExteriorRing, path + ".shell", errors);
+                if (polygon.NumInteriorRings != restoredPolygon.NumInteriorRings)
+                    errors.Add("messagepack", $"{path}: expected {polygon.NumInteriorRings} holes, actual {restoredPolygon.NumInteriorRings}");
+                for (var index = 0; index < Math.Min(polygon.NumInteriorRings, restoredPolygon.NumInteriorRings); index++)
+                    CompareGeometry(polygon.GetInteriorRingN(index), restoredPolygon.GetInteriorRingN(index), $"{path}.holes[{index}]", errors);
+                break;
+            case GeometryCollection collection:
+                var restoredCollection = (GeometryCollection)actual;
+                if (collection.NumGeometries != restoredCollection.NumGeometries)
+                    errors.Add("messagepack", $"{path}: expected {collection.NumGeometries} children, actual {restoredCollection.NumGeometries}");
+                for (var index = 0; index < Math.Min(collection.NumGeometries, restoredCollection.NumGeometries); index++)
+                    CompareGeometry(collection.GetGeometryN(index), restoredCollection.GetGeometryN(index), $"{path}.children[{index}]", errors);
+                break;
+            default:
+                throw new InvalidDataException($"{path}: unsupported geometry type {expected.GeometryType}");
+        }
+    }
+
+    private static void CompareCoordinates(CoordinateSequence expected, CoordinateSequence actual, string path, ComparisonErrors errors)
+    {
+        if (expected.Count != actual.Count || expected.Dimension != actual.Dimension || expected.Measures != actual.Measures)
+            errors.Add("messagepack", $"{path}.coordinates: expected count/dimension/measures {expected.Count}/{expected.Dimension}/{expected.Measures}, actual {actual.Count}/{actual.Dimension}/{actual.Measures}");
+        for (var coordinate = 0; coordinate < Math.Min(expected.Count, actual.Count); coordinate++)
+            for (var ordinate = 0; ordinate < Math.Min(expected.Dimension, actual.Dimension); ordinate++)
+            {
+                var expectedBits = BitConverter.DoubleToInt64Bits(expected.GetOrdinate(coordinate, ordinate));
+                var actualBits = BitConverter.DoubleToInt64Bits(actual.GetOrdinate(coordinate, ordinate));
+                if (expectedBits != actualBits)
+                    errors.Add("messagepack", $"{path}.coordinates[{coordinate}][{ordinate}]: expected bits 0x{expectedBits:X16}, actual 0x{actualBits:X16}");
+            }
+    }
 
     private static object? Metadata(object? value)
     {

@@ -85,4 +85,7 @@ dotnet run --project tools/ResPlan.Validation -c Release -- \
   supported even when pickle recreates separate NaN objects in adjacency maps;
   distinct nodes with the same string ID remain an error.
 - MessagePack round trips use the same complete snapshot with **zero numeric
-  tolerance**, including graph areas. These checks run on every selected plan.
+  tolerance**, including graph areas. A separate recursive comparison also checks
+  geometry types, SRIDs, coordinate dimensions/measures, and every ordinate's
+  exact bits, including empty sequences and individual collection components.
+  These checks run on every selected plan and include geometry in both graphs.

@@ -81,7 +81,7 @@ PlanSerializer.SaveToFile(plan, "floorplan.msgpack");
 var restored = PlanSerializer.LoadFromFile("floorplan.msgpack");
 ```
 
-Rendering preserves aspect ratio on square, portrait, and landscape canvases. Graph generation and rendering traverse multipart geometries. MessagePack preserves geometry SRIDs, Z/M coordinates, metadata, and stored graphs; legacy two-dimensional WKB payloads remain readable.
+Rendering preserves aspect ratio on square, portrait, and landscape canvases. Graph generation and rendering traverse multipart geometries. MessagePack preserves geometry SRIDs, each component's XY/XYZ/XYM/XYZM schema (including empty geometries), metadata, and stored graphs; legacy two-dimensional WKB payloads remain readable. Polygon rings must share one coordinate schema, as required by WKB; mixed ring schemas are rejected rather than silently adding or dropping ordinates.
 
 To filter by a containing polygon, pass `constraints: new PlanGenerationConstraints { BoundingPolygon = polygon }`. Boundary contact is allowed. Constraints use the visible and semantic anchor categories described above, falling back to all geometry when those categories are empty. Neighboring plots do not affect containment when visible plan geometry is present.
 
