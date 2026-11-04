@@ -9,14 +9,15 @@
     <Company>ResPlan</Company>
     <Product>ResPlan</Product>
     <Description>A library for working with the ResPlan dataset.</Description>
-    <RepositoryUrl>https://github.com/ResPlan/ResPlan</RepositoryUrl>
+    <RepositoryUrl>https://github.com/Xyrces/resPlan.NET</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>ResPlan;Dataset;Graph;Planning</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="MessagePack" Version="3.1.4" />
+    <PackageReference Include="MessagePack" Version="3.1.12" />
     <PackageReference Include="MinVer" Version="6.0.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
@@ -27,27 +28,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\resplan_loader.py">
-      <Link>resplan_loader.py</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Pack>true</Pack>
-      <PackagePath>contentFiles/any/any;content</PackagePath>
-      <PackageCopyToOutput>true</PackageCopyToOutput>
-    </Content>
-    <Content Include="..\resplan_utils.py">
-      <Link>resplan_utils.py</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Pack>true</Pack>
-      <PackagePath>contentFiles/any/any;content</PackagePath>
-      <PackageCopyToOutput>true</PackageCopyToOutput>
-    </Content>
-    <Content Include="..\resplan_loader_wrapper.py">
-      <Link>resplan_loader_wrapper.py</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Pack>true</Pack>
-      <PackagePath>contentFiles/any/any;content</PackagePath>
-      <PackageCopyToOutput>true</PackageCopyToOutput>
-    </Content>
+    <ProjectReference Include="../extern/Pickle.Net/src/Pickle.Net/Pickle.Net.csproj" />
+    <None Include="../README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
 
 </Project>

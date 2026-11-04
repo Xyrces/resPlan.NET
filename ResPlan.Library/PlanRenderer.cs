@@ -31,6 +31,9 @@ namespace ResPlan.Library
 
         public static void Render(Plan plan, string outputPath, int width = 800, int height = 800)
         {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
+
             using var surface = SKSurface.Create(new SKImageInfo(width, height));
             var canvas = surface.Canvas;
             canvas.Clear(SKColors.White);
@@ -38,39 +41,20 @@ namespace ResPlan.Library
             var bounds = plan.Bounds;
             if (bounds == null || bounds.IsNull) return;
 
-            // Calculate fit to square logic
+            // Fit the actual bounds into the requested canvas, preserving aspect ratio.
             double w = bounds.Width;
             double h = bounds.Height;
-
-            double minX = bounds.MinX;
-            double minY = bounds.MinY;
-            double maxX = bounds.MaxX;
-            double maxY = bounds.MaxY;
-
-            if (w > h)
-            {
-                // wider, expand height
-                double cy = (minY + maxY) / 2.0;
-                double half = w / 2.0;
-                minY = cy - half;
-                maxY = cy + half;
-            }
-            else
-            {
-                // taller, expand width
-                double cx = (minX + maxX) / 2.0;
-                double half = h / 2.0;
-                minX = cx - half;
-                maxX = cx + half;
-            }
-
-            float scale = (float)(width / (maxX - minX));
+            double xScale = w > 0 ? width / w : double.PositiveInfinity;
+            double yScale = h > 0 ? height / h : double.PositiveInfinity;
+            double scale = w == 0 && h == 0 ? 1 : Math.Min(xScale, yScale);
+            double offsetX = (width - w * scale) / 2;
+            double offsetY = (height - h * scale) / 2;
 
             SKPoint Transform(double x, double y)
             {
                 return new SKPoint(
-                    (float)((x - minX) * scale),
-                    height - (float)((y - minY) * scale)
+                    (float)(offsetX + (x - bounds.MinX) * scale),
+                    (float)(offsetY + (bounds.MaxY - y) * scale)
                 );
             }
 
@@ -95,7 +79,7 @@ namespace ResPlan.Library
                     IsAntialias = true
                 };
 
-                foreach (var geom in plan.Geometries[cat])
+                foreach (var geom in GeometryParts.Enumerate(plan.Geometries[cat]))
                 {
                     if (geom is Polygon poly)
                     {

@@ -1,0 +1,8 @@
+# Python 3.14.4 was used to generate the checked-in sample oracle.
+# These imports are required by the existing resplan_utils.py reference module.
+numpy==2.5.4
+shapely==2.2.0
+networkx==3.7
+geopandas==1.2.0
+matplotlib==3.11.2
+opencv-python-headless==5.0.0.93

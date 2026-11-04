@@ -1,169 +1,107 @@
 # ResPlan.NET
 
-ResPlan.NET is a .NET 9 library for working with the ResPlan dataset (Residential Floorplans). It provides functionality to load floorplan data (geometry and metadata), generate connectivity graphs (representing room adjacency and connections), and render floorplans to images.
+ResPlan.NET loads the ResPlan residential floorplan dataset, generates room connectivity graphs, renders PNGs, and saves plans with MessagePack. Pickle ingestion is implemented entirely in C# using [Pickle.Net](https://github.com/Xyrces/Pickle.Net). Running the library requires neither Python nor a virtual environment.
 
-This library is a .NET port/adaptation of the original Python implementation, designed to be performant and easy to use within the .NET ecosystem while leveraging the existing Python data ingestion logic.
+The library targets .NET 9. Tests run on .NET 9 and .NET 10. Rendering uses SkiaSharp; geometry operations use NetTopologySuite.
 
-## Prerequisites
+## Build from source
 
-*   **.NET 9 SDK**
-*   **Python 3.x**: Required for the underlying data loader mechanism. The library manages a local virtual environment for dependencies.
+Pickle.Net is pinned as a Git submodule so a fresh checkout builds without requiring an unpublished NuGet dependency:
 
-## Installation
+```sh
+git clone --recurse-submodules https://github.com/Xyrces/resPlan.NET.git
+cd resPlan.NET
+dotnet restore ResPlan.slnx
+dotnet build ResPlan.slnx -c Release
+dotnet test ResPlan.Tests/ResPlan.Tests.csproj -c Release
+```
 
-Add a reference to the `ResPlan.Library` project or install the `ResPlan.NET` NuGet package.
+Install the .NET 10 SDK and the .NET 9 runtime to run both test targets. For an existing checkout, run `git submodule update --init --recursive`. Applications can reference `ResPlan.Library/ResPlan.Library.csproj` directly.
 
-## Quick Start
+To produce packages, build first, then pack both projects:
 
-The following examples demonstrate the core functionality of the library.
+```sh
+dotnet pack extern/Pickle.Net/src/Pickle.Net/Pickle.Net.csproj -c Release -o artifacts
+dotnet pack ResPlan.Library/ResPlan.Library.csproj -c Release -o artifacts
+```
 
-### 1. Loading Plans
+The ResPlan.NET package depends on Pickle.Net 0.1.0. Consumers need both packages available from their configured NuGet sources, alongside NuGet.org for the other dependencies. CI builds both packages as downloadable artifacts. Registry publication is an explicit workflow dispatch from `main`, after Pickle.Net has been released from its own repository; a dependency check prevents publishing an unusable ResPlan.NET package. Pull requests never publish packages. Previously published ResPlan.NET versions may still use Python.
 
-The `PlanLoader` class handles loading data. It uses a Python subprocess to parse the original `.pkl` data files securely.
-
-You can optionally provide a logger callback to stream progress updates (e.g., dependency installation, data download progress).
+## Load a dataset
 
 ```csharp
 using ResPlan.Library;
 
-// Define a simple logger
-Action<string> logger = (msg) => Console.WriteLine($"[ResPlan] {msg}");
-
-// Load plans.
-// Passing 'null' as the first argument triggers the default behavior:
-// It ensures the data and Python dependencies are present, then loads the dataset.
-// 'maxItems' is optional, used here to limit the load for demonstration.
 var plans = await PlanLoader.LoadPlansAsync(
-    jsonPath: null,
-    pklPathOverride: null,
+    pklPathOverride: "/data/ResPlan.pkl",
     maxItems: 10,
-    logger: logger
-);
-
-Console.WriteLine($"Loaded {plans.Count} plans.");
-```
-
-### 2. Applying Constraints (Optional)
-
-You can filter plans using `PlanGenerationConstraints`.
-
-```csharp
-using NetTopologySuite.Geometries;
-using System.Numerics;
-
-// Define a bounding box polygon (must contain the plan)
-var coordinates = new[]
-{
-    new Coordinate(0, 0),
-    new Coordinate(100, 0),
-    new Coordinate(100, 100),
-    new Coordinate(0, 100),
-    new Coordinate(0, 0) // Close the loop
-};
-var boundingPoly = new GeometryFactory().CreatePolygon(coordinates);
-
-// Define constraints
-var constraints = new PlanGenerationConstraints
-{
-    // Filter: Plan must fit inside this polygon
-    BoundingPolygon = boundingPoly
-};
-
-var constrainedPlans = await PlanLoader.LoadPlansAsync(
-    maxItems: 5,
-    logger: logger,
-    constraints: constraints
-);
-```
-
-### 3. Vertical Anchors (Semantic Data)
-
-Plans now expose semantic data to assist with vertical stacking and alignment in 3D generation contexts. The `GetVerticalAnchors()` method returns geometries that serve as optimal connection points between floors (e.g., stairs, elevators, or central corridors).
-
-```csharp
-using ResPlan.Library;
+    logger: Console.WriteLine);
 
 foreach (var plan in plans)
 {
-    var anchors = plan.GetVerticalAnchors();
-    Console.WriteLine($"Plan {plan.Id} has {anchors.Count} vertical anchors.");
-
-    foreach (var anchor in anchors)
-    {
-        Console.WriteLine($"  - Anchor at {anchor.Centroid}");
-    }
+    Console.WriteLine($"Index {plan.Id}, source ID {plan.Metadata["id"]}");
+    Console.WriteLine($"{plan.Geometries.Count} geometry categories");
 }
 ```
 
-### 4. Generating Connectivity Graphs
+Omitting both paths downloads the pinned dataset revision, verifies its SHA-256, and caches `ResPlan/ResPlan.pkl`. Existing local datasets are respected. An explicit missing path throws instead of triggering an unexpected download. To load an existing JSON export, pass `jsonPath` or call `PlanLoader.LoadPlans(path)`.
 
-Once a `Plan` is loaded, you can generate a graph representing the connectivity between rooms, doors, and windows using `GraphGenerator`.
+`maxItems` selects the first records **before** applying constraints, consistently for JSON and pickle. Zero returns an empty list without downloading. Negative limits throw. Pickle stores a single object graph: limiting results does not avoid decoding the complete file or its memory cost.
+
+Cancellation is available through an overload:
+
+```csharp
+var plans = await PlanLoader.LoadPlansAsync(
+    cancellationToken: cancellationToken,
+    pklPathOverride: "/data/ResPlan.pkl",
+    maxItems: 100);
+```
+
+## Geometry, metadata, and graphs
+
+- `Plan.Id` remains the zero-based input index for compatibility. The original dataset identifier is retained in `Plan.Metadata["id"]`.
+- `Geometries` preserves every geometry category, including auxiliary categories, empty categories, and the neighboring geometries stored in tuples. Multipart values are expanded into their component geometries. `balacony` is normalized when `balcony` is absent; `stair` also supplies a `stairs` alias.
+- `Metadata` retains nongeometry fields such as `unitType`, `area`, `net_area`, and `wall_depth`. It supports scalar values, byte buffers, arrays, and dictionaries with string keys. Unsupported values cause a descriptive error rather than disappearing.
+- `WallWidth` controls graph buffering and defaults to `0.1`. A zero value uses the same fallback. `wall_depth` remains separate metadata; it is not substituted for `wall_width`.
+- `ReferenceGraph` is generated from the plan geometry, matching the former loader's behavior. It is not an independent ground-truth graph. When a pickle contains a NetworkX graph, `SourceGraph` retains it separately, including node, edge, and graph attributes.
+- Stored graph IDs retain the original Python/NumPy scalar spelling. Numerically equal edge endpoints (such as `1`, `1.0`, and `True`) resolve to the original node before conversion. Distinct nodes whose IDs genuinely collide after string conversion are rejected.
+- `Bounds` covers visible rooms, walls, openings, and semantic anchor categories, with a fallback to all geometry for plans without those categories. Auxiliary neighboring plots do not normally expand the viewport.
 
 ```csharp
 using ResPlan.Library;
-
-foreach (var plan in plans)
-{
-    // Generate the graph based on geometry intersections and room types
-    Graph graph = GraphGenerator.GenerateGraph(plan);
-
-    Console.WriteLine($"Generated Graph for Plan {plan.Id}:");
-    Console.WriteLine($"  Nodes: {graph.Nodes.Count}");
-    Console.WriteLine($"  Edges: {graph.Edges.Count}");
-
-    // Example: Inspecting nodes
-    foreach(var node in graph.Nodes.Values)
-    {
-        Console.WriteLine($"    Node {node.Id} ({node.Type}) - Area: {node.Area:F2}");
-    }
-}
-```
-
-### 5. Rendering Floorplans
-
-You can visualize the floorplan using `PlanRenderer`. This uses SkiaSharp to produce an image file.
-
-```csharp
-using ResPlan.Library;
-
-foreach (var plan in plans)
-{
-    string outputPath = $"plan_{plan.Id}.png";
-
-    // Render the plan to a PNG file (default 800x800)
-    PlanRenderer.Render(plan, outputPath);
-
-    Console.WriteLine($"Rendered plan to {outputPath}");
-}
-```
-
-### 6. Serialization
-
-To support binary serialization and handle special floating-point values (like `NaN` or `Infinity`) which are not standard in JSON, the library provides a helper class `PlanSerializer` using **MessagePack**.
-
-```csharp
 using ResPlan.Library.Data;
 
-// Serialize a Plan to a byte array
-byte[] data = PlanSerializer.Serialize(plan);
+var plan = plans[0];
+var graph = GraphGenerator.GenerateGraph(plan);
+var entrance = plan.GetEntrance();
+var verticalAnchors = plan.GetVerticalAnchors();
 
-// Deserialize back to a Plan object
-Plan loadedPlan = PlanSerializer.Deserialize(data);
-
-// Or save/load directly to file
-PlanSerializer.SaveToFile(plan, "plan.msgpack");
-var loadedFromFile = PlanSerializer.LoadFromFile("plan.msgpack");
+PlanRenderer.Render(plan, "floorplan.png", width: 1200, height: 800);
+PlanSerializer.SaveToFile(plan, "floorplan.msgpack");
+var restored = PlanSerializer.LoadFromFile("floorplan.msgpack");
 ```
 
-## Documentation
+Rendering preserves aspect ratio on square, portrait, and landscape canvases. Graph generation and rendering traverse multipart geometries. MessagePack preserves geometry SRIDs, each component's XY/XYZ/XYM/XYZM schema (including empty geometries), metadata, and stored graphs; legacy two-dimensional WKB payloads remain readable. Polygon rings must share one coordinate schema, as required by WKB; mixed ring schemas are rejected rather than silently adding or dropping ordinates.
 
-For a deep dive into the architecture, internal mechanisms (including the Python integration), and detailed API reference, please see [DOCUMENTATION.md](DOCUMENTATION.md).
+To filter by a containing polygon, pass `constraints: new PlanGenerationConstraints { BoundingPolygon = polygon }`. Boundary contact is allowed. Constraints use the visible and semantic anchor categories described above, falling back to all geometry when those categories are empty. Neighboring plots do not affect containment when visible plan geometry is present.
 
-## Attribution & Citation
+## Input compatibility and limits
 
-This library is a port of the [ResPlan](https://github.com/m-agour/ResPlan) project. The original dataset and code were developed by Mohamed Abouagour and Eleftherios Garyfallidis.
+The native adapter explicitly supports Shapely WKB geometry, NumPy scalar numbers/booleans/strings and dtypes, and NetworkX `Graph`/`NodeView` state. NumPy 1.x and 2.x scalar module names are recognized. Arbitrary Python classes, NumPy arrays/structured dtypes, and other NetworkX graph classes require additional adapters and are rejected.
 
-If you use this library or the ResPlan dataset in your research, please cite the original paper:
+Pickle.Net never imports Python modules or executes Python code. Its constructor registry is an allowlist. The loader also limits input to 512 MiB, memo entries to 2,000,000, and individual pickle blobs/frames to 64 MiB. These limits do not make geometry processing or deserialization a general security sandbox. Process datasets within appropriate memory/time budgets.
+
+Legacy JSON exports containing bare or quoted `NaN`/`Infinity` are accepted: nonfinite reference-node areas become zero and invalid bounds become an empty envelope. MessagePack can represent nonfinite metadata values directly.
+
+## Validation
+
+The ordinary test suite is fully native and uses committed fixtures. It covers pickle protocols 0–5, NumPy byte order, NetworkX reconstruction, unknown-global rejection, malformed inputs, limits/cancellation, JSON behavior, graph topology, image comparisons, multipart rendering, and MessagePack compatibility.
+
+An independent Python oracle is retained **only for development verification**. See [DOCUMENTATION.md](DOCUMENTATION.md) for full-dataset comparison commands, the pinned dataset hashes, packaging details, and migration notes. Python helper files are not shipped in the library package.
+
+## Attribution
+
+This library adapts [ResPlan](https://github.com/m-agour/ResPlan), developed by Mohamed Abouagour and Eleftherios Garyfallidis. Please cite their work when using the dataset in research:
 
 ```bibtex
 @article{AbouagourGaryfallidis2025ResPlan,
@@ -178,8 +116,4 @@ If you use this library or the ResPlan dataset in your research, please cite the
 
 ## License
 
-This project (ResPlan.NET) is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for details.
-
-### Dataset License
-
-The **ResPlan dataset** (the `.pkl` files and derived data) is distributed by the original authors. According to the [Kaggle distribution](https://www.kaggle.com/datasets/resplan/resplan), the dataset is licensed under **CC BY-NC-SA 4.0** (Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International). Users are responsible for adhering to the dataset's license terms.
+The ResPlan.NET code is licensed under the [MIT License](LICENSE). The dataset has separate terms: the [Kaggle distribution](https://www.kaggle.com/datasets/resplan/resplan) identifies it as CC BY-NC-SA 4.0. Consult the dataset distributor's terms before using or redistributing dataset files or derived data.

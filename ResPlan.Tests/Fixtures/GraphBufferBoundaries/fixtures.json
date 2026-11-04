@@ -1,0 +1,212 @@
+{
+  "schema": "resplan-graph-buffer-boundaries-v1",
+  "pickle_protocol": 5,
+  "reference_quadrant_segments": 16,
+  "coarse_quadrant_segments": 8,
+  "generator_sha256": "ce9a74787e93fff4a350fdea2eedffd4e1dd9c27d43188c1f5e7c348e21aeb5f",
+  "reference_sha256": "f03c5e51cc7f90da9f1f153a5e1d3390a41cd3e0537db56041d9006e1e1daec9",
+  "versions": {
+    "python": "3.14.4",
+    "shapely": "2.2.0",
+    "geos": "3.14.1",
+    "networkx": "3.7"
+  },
+  "cases": [
+    {
+      "name": "direct_True",
+      "expected": {
+        "nodes": [
+          "front_door_0",
+          "living_0"
+        ],
+        "edges": [
+          [
+            "front_door_0",
+            "living_0",
+            "direct"
+          ]
+        ]
+      },
+      "payload": "gAWV5AAAAAAAAABdlH2UKIwKd2FsbF93aWR0aJRHP7mZmZmZmZqMBmxpdmluZ5SMCnNoYXBlbHkuaW+UjAhmcm9tX3drYpSTlENdAQMAAAABAAAABQAAAAAAAAAAAPA/AAAAAAAAAAAAAAAAAADwPwAAAAAAAPA/AAAAAAAAAAAAAAAAAADwPwAAAAAAAAAAAAAAAAAAAAAAAAAAAADwPwAAAAAAAAAAlIWUUpSMCmZyb250X2Rvb3KUaAZDKQECAAAAAgAAAFy1Xs7nMPE/zUZt0wce8D9ctV7O5zDxPzcD4mYgIvA/lIWUUpR1YS4="
+    },
+    {
+      "name": "direct_False",
+      "expected": {
+        "nodes": [
+          "front_door_0",
+          "living_0"
+        ],
+        "edges": []
+      },
+      "payload": "gAWV5AAAAAAAAABdlH2UKIwKd2FsbF93aWR0aJRHP7mZmZmZmZqMBmxpdmluZ5SMCnNoYXBlbHkuaW+UjAhmcm9tX3drYpSTlENdAQMAAAABAAAABQAAAAAAAAAAAPA/AAAAAAAAAAAAAAAAAADwPwAAAAAAAPA/AAAAAAAAAAAAAAAAAADwPwAAAAAAAAAAAAAAAAAAAAAAAAAAAADwPwAAAAAAAAAAlIWUUpSMCmZyb250X2Rvb3KUaAZDKQECAAAAAgAAAG4thDeJMvE/F+rv7zAe8D9uLYQ3iTLxP4GmZINJIvA/lIWUUpR1YS4="
+    },
+    {
+      "name": "adjacency_kitchen_True",
+      "expected": {
+        "nodes": [
+          "kitchen_0",
+          "living_0"
+        ],
+        "edges": [
+          [
+            "kitchen_0",
+            "living_0",
+            "adjacency"
+          ]
+        ]
+      },
+      "payload": "gAWVFQEAAAAAAABdlH2UKIwKd2FsbF93aWR0aJRHP7mZmZmZmZqMBmxpdmluZ5SMCnNoYXBlbHkuaW+UjAhmcm9tX3drYpSTlENdAQMAAAABAAAABQAAAAAAAAAAAPA/AAAAAAAAAAAAAAAAAADwPwAAAAAAAPA/AAAAAAAAAAAAAAAAAADwPwAAAAAAAAAAAAAAAAAAAAAAAAAAAADwPwAAAAAAAAAAlIWUUpSMB2tpdGNoZW6UaAZDXQEDAAAAAQAAAAUAAAASzCBqLMoBQLF3ypZAWvA/EswgaizKAUDYO2VLIC0AQCWYQdRYlPM/2DtlSyAtAEAlmEHUWJTzP7F3ypZAWvA/EswgaizKAUCxd8qWQFrwP5SFlFKUdWEu"
+    },
+    {
+      "name": "adjacency_kitchen_False",
+      "expected": {
+        "nodes": [
+          "kitchen_0",
+          "living_0"
+        ],
+        "edges": []
+      },
+      "payload": "gAWVFQEAAAAAAABdlH2UKIwKd2FsbF93aWR0aJRHP7mZmZmZmZqMBmxpdmluZ5SMCnNoYXBlbHkuaW+UjAhmcm9tX3drYpSTlENdAQMAAAABAAAABQAAAAAAAAAAAPA/AAAAAAAAAAAAAAAAAADwPwAAAAAAAPA/AAAAAAAAAAAAAAAAAADwPwAAAAAAAAAAAAAAAAAAAAAAAAAAAADwPwAAAAAAAAAAlIWUUpSMB2tpdGNoZW6UaAZDXQEDAAAAAQAAAAUAAAAciLMe/coBQPoaTbNpWvA/HIizHv3KAUB9jabZNC0AQDcQZz36lfM/fY2m2TQtAEA3EGc9+pXzP/oaTbNpWvA/HIizHv3KAUD6Gk2zaVrwP5SFlFKUdWEu"
+    },
+    {
+      "name": "adjacency_bedroom_True",
+      "expected": {
+        "nodes": [
+          "bedroom_0",
+          "living_0"
+        ],
+        "edges": [
+          [
+            "bedroom_0",
+            "living_0",
+            "adjacency"
+          ]
+        ]
+      },
+      "payload": "gAWVFQEAAAAAAABdlH2UKIwKd2FsbF93aWR0aJRHP7mZmZmZmZqMBmxpdmluZ5SMCnNoYXBlbHkuaW+UjAhmcm9tX3drYpSTlENdAQMAAAABAAAABQAAAAAAAAAAAPA/AAAAAAAAAAAAAAAAAADwPwAAAAAAAPA/AAAAAAAAAAAAAAAAAADwPwAAAAAAAAAAAAAAAAAAAAAAAAAAAADwPwAAAAAAAAAAlIWUUpSMB2JlZHJvb22UaAZDXQEDAAAAAQAAAAUAAAASzCBqLMoBQLF3ypZAWvA/EswgaizKAUDYO2VLIC0AQCWYQdRYlPM/2DtlSyAtAEAlmEHUWJTzP7F3ypZAWvA/EswgaizKAUCxd8qWQFrwP5SFlFKUdWEu"
+    },
+    {
+      "name": "adjacency_bedroom_False",
+      "expected": {
+        "nodes": [
+          "bedroom_0",
+          "living_0"
+        ],
+        "edges": []
+      },
+      "payload": "gAWVFQEAAAAAAABdlH2UKIwKd2FsbF93aWR0aJRHP7mZmZmZmZqMBmxpdmluZ5SMCnNoYXBlbHkuaW+UjAhmcm9tX3drYpSTlENdAQMAAAABAAAABQAAAAAAAAAAAPA/AAAAAAAAAAAAAAAAAADwPwAAAAAAAPA/AAAAAAAAAAAAAAAAAADwPwAAAAAAAAAAAAAAAAAAAAAAAAAAAADwPwAAAAAAAAAAlIWUUpSMB2JlZHJvb22UaAZDXQEDAAAAAQAAAAUAAAAciLMe/coBQPoaTbNpWvA/HIizHv3KAUB9jabZNC0AQDcQZz36lfM/fY2m2TQtAEA3EGc9+pXzP/oaTbNpWvA/HIizHv3KAUD6Gk2zaVrwP5SFlFKUdWEu"
+    },
+    {
+      "name": "via_door_source_True",
+      "expected": {
+        "nodes": [
+          "bathroom_0",
+          "living_0"
+        ],
+        "edges": [
+          [
+            "bathroom_0",
+            "living_0",
+            "via_door"
+          ]
+        ]
+      },
+      "payload": "gAWVTwEAAAAAAABdlH2UKIwKd2FsbF93aWR0aJRHP7mZmZmZmZqMCGJhdGhyb29tlIwKc2hhcGVseS5pb5SMCGZyb21fd2tilJOUQ10BAwAAAAEAAAAFAAAAAAAAAAAA8D8AAAAAAAAAAAAAAAAAAPA/AAAAAAAA8D8AAAAAAAAAAAAAAAAAAPA/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAPA/AAAAAAAAAACUhZRSlIwGbGl2aW5nlGgGQ10BAwAAAAEAAAAFAAAAZmZmZmZm8j+uR+F6FK7vP2ZmZmZmZvI/cT0K16Nw8T/NzMzMzMzwP3E9CtejcPE/zczMzMzM8D+uR+F6FK7vP2ZmZmZmZvI/rkfhehSu7z+UhZRSlIwEZG9vcpRoBkMpAQIAAAACAAAAXLVezucw8T/NRm3TBx7wP1y1Xs7nMPE/NwPiZiAi8D+UhZRSlHVhLg=="
+    },
+    {
+      "name": "via_door_source_False",
+      "expected": {
+        "nodes": [
+          "bathroom_0",
+          "living_0"
+        ],
+        "edges": []
+      },
+      "payload": "gAWVTwEAAAAAAABdlH2UKIwKd2FsbF93aWR0aJRHP7mZmZmZmZqMCGJhdGhyb29tlIwKc2hhcGVseS5pb5SMCGZyb21fd2tilJOUQ10BAwAAAAEAAAAFAAAAAAAAAAAA8D8AAAAAAAAAAAAAAAAAAPA/AAAAAAAA8D8AAAAAAAAAAAAAAAAAAPA/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAPA/AAAAAAAAAACUhZRSlIwGbGl2aW5nlGgGQ10BAwAAAAEAAAAFAAAAZmZmZmZm8j+uR+F6FK7vP2ZmZmZmZvI/cT0K16Nw8T/NzMzMzMzwP3E9CtejcPE/zczMzMzM8D+uR+F6FK7vP2ZmZmZmZvI/rkfhehSu7z+UhZRSlIwEZG9vcpRoBkMpAQIAAAACAAAAbi2EN4ky8T8X6u/vMB7wP24thDeJMvE/gaZkg0ki8D+UhZRSlHVhLg=="
+    },
+    {
+      "name": "via_door_target_True",
+      "expected": {
+        "nodes": [
+          "bathroom_0",
+          "living_0"
+        ],
+        "edges": [
+          [
+            "bathroom_0",
+            "living_0",
+            "via_door"
+          ]
+        ]
+      },
+      "payload": "gAWVTwEAAAAAAABdlH2UKIwKd2FsbF93aWR0aJRHP7mZmZmZmZqMCGJhdGhyb29tlIwKc2hhcGVseS5pb5SMCGZyb21fd2tilJOUQ10BAwAAAAEAAAAFAAAAZmZmZmZm8j+uR+F6FK7vP2ZmZmZmZvI/cT0K16Nw8T/NzMzMzMzwP3E9CtejcPE/zczMzMzM8D+uR+F6FK7vP2ZmZmZmZvI/rkfhehSu7z+UhZRSlIwGbGl2aW5nlGgGQ10BAwAAAAEAAAAFAAAAAAAAAAAA8D8AAAAAAAAAAAAAAAAAAPA/AAAAAAAA8D8AAAAAAAAAAAAAAAAAAPA/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAPA/AAAAAAAAAACUhZRSlIwEZG9vcpRoBkMpAQIAAAACAAAAXLVezucw8T/NRm3TBx7wP1y1Xs7nMPE/NwPiZiAi8D+UhZRSlHVhLg=="
+    },
+    {
+      "name": "via_door_target_False",
+      "expected": {
+        "nodes": [
+          "bathroom_0",
+          "living_0"
+        ],
+        "edges": []
+      },
+      "payload": "gAWVTwEAAAAAAABdlH2UKIwKd2FsbF93aWR0aJRHP7mZmZmZmZqMCGJhdGhyb29tlIwKc2hhcGVseS5pb5SMCGZyb21fd2tilJOUQ10BAwAAAAEAAAAFAAAAZmZmZmZm8j+uR+F6FK7vP2ZmZmZmZvI/cT0K16Nw8T/NzMzMzMzwP3E9CtejcPE/zczMzMzM8D+uR+F6FK7vP2ZmZmZmZvI/rkfhehSu7z+UhZRSlIwGbGl2aW5nlGgGQ10BAwAAAAEAAAAFAAAAAAAAAAAA8D8AAAAAAAAAAAAAAAAAAPA/AAAAAAAA8D8AAAAAAAAAAAAAAAAAAPA/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAPA/AAAAAAAAAACUhZRSlIwEZG9vcpRoBkMpAQIAAAACAAAAbi2EN4ky8T8X6u/vMB7wP24thDeJMvE/gaZkg0ki8D+UhZRSlHVhLg=="
+    },
+    {
+      "name": "via_window_source_True",
+      "expected": {
+        "nodes": [
+          "balcony_0",
+          "bedroom_0"
+        ],
+        "edges": [
+          [
+            "balcony_0",
+            "bedroom_0",
+            "via_window"
+          ]
+        ]
+      },
+      "payload": "gAWVUQEAAAAAAABdlH2UKIwKd2FsbF93aWR0aJRHP7mZmZmZmZqMB2JhbGNvbnmUjApzaGFwZWx5LmlvlIwIZnJvbV93a2KUk5RDXQEDAAAAAQAAAAUAAAAAAAAAAADwPwAAAAAAAAAAAAAAAAAA8D8AAAAAAADwPwAAAAAAAAAAAAAAAAAA8D8AAAAAAAAAAAAAAAAAAAAAAAAAAAAA8D8AAAAAAAAAAJSFlFKUjAdiZWRyb29tlGgGQ10BAwAAAAEAAAAFAAAAZmZmZmZm8j+uR+F6FK7vP2ZmZmZmZvI/cT0K16Nw8T/NzMzMzMzwP3E9CtejcPE/zczMzMzM8D+uR+F6FK7vP2ZmZmZmZvI/rkfhehSu7z+UhZRSlIwGd2luZG93lGgGQykBAgAAAAIAAABctV7O5zDxP81GbdMHHvA/XLVezucw8T83A+JmICLwP5SFlFKUdWEu"
+    },
+    {
+      "name": "via_window_source_False",
+      "expected": {
+        "nodes": [
+          "balcony_0",
+          "bedroom_0"
+        ],
+        "edges": []
+      },
+      "payload": "gAWVUQEAAAAAAABdlH2UKIwKd2FsbF93aWR0aJRHP7mZmZmZmZqMB2JhbGNvbnmUjApzaGFwZWx5LmlvlIwIZnJvbV93a2KUk5RDXQEDAAAAAQAAAAUAAAAAAAAAAADwPwAAAAAAAAAAAAAAAAAA8D8AAAAAAADwPwAAAAAAAAAAAAAAAAAA8D8AAAAAAAAAAAAAAAAAAAAAAAAAAAAA8D8AAAAAAAAAAJSFlFKUjAdiZWRyb29tlGgGQ10BAwAAAAEAAAAFAAAAZmZmZmZm8j+uR+F6FK7vP2ZmZmZmZvI/cT0K16Nw8T/NzMzMzMzwP3E9CtejcPE/zczMzMzM8D+uR+F6FK7vP2ZmZmZmZvI/rkfhehSu7z+UhZRSlIwGd2luZG93lGgGQykBAgAAAAIAAABuLYQ3iTLxPxfq7+8wHvA/bi2EN4ky8T+BpmSDSSLwP5SFlFKUdWEu"
+    },
+    {
+      "name": "via_window_target_True",
+      "expected": {
+        "nodes": [
+          "balcony_0",
+          "bedroom_0"
+        ],
+        "edges": [
+          [
+            "balcony_0",
+            "bedroom_0",
+            "via_window"
+          ]
+        ]
+      },
+      "payload": "gAWVUQEAAAAAAABdlH2UKIwKd2FsbF93aWR0aJRHP7mZmZmZmZqMB2JhbGNvbnmUjApzaGFwZWx5LmlvlIwIZnJvbV93a2KUk5RDXQEDAAAAAQAAAAUAAABmZmZmZmbyP65H4XoUru8/ZmZmZmZm8j9xPQrXo3DxP83MzMzMzPA/cT0K16Nw8T/NzMzMzMzwP65H4XoUru8/ZmZmZmZm8j+uR+F6FK7vP5SFlFKUjAdiZWRyb29tlGgGQ10BAwAAAAEAAAAFAAAAAAAAAAAA8D8AAAAAAAAAAAAAAAAAAPA/AAAAAAAA8D8AAAAAAAAAAAAAAAAAAPA/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAPA/AAAAAAAAAACUhZRSlIwGd2luZG93lGgGQykBAgAAAAIAAABctV7O5zDxP81GbdMHHvA/XLVezucw8T83A+JmICLwP5SFlFKUdWEu"
+    },
+    {
+      "name": "via_window_target_False",
+      "expected": {
+        "nodes": [
+          "balcony_0",
+          "bedroom_0"
+        ],
+        "edges": []
+      },
+      "payload": "gAWVUQEAAAAAAABdlH2UKIwKd2FsbF93aWR0aJRHP7mZmZmZmZqMB2JhbGNvbnmUjApzaGFwZWx5LmlvlIwIZnJvbV93a2KUk5RDXQEDAAAAAQAAAAUAAABmZmZmZmbyP65H4XoUru8/ZmZmZmZm8j9xPQrXo3DxP83MzMzMzPA/cT0K16Nw8T/NzMzMzMzwP65H4XoUru8/ZmZmZmZm8j+uR+F6FK7vP5SFlFKUjAdiZWRyb29tlGgGQ10BAwAAAAEAAAAFAAAAAAAAAAAA8D8AAAAAAAAAAAAAAAAAAPA/AAAAAAAA8D8AAAAAAAAAAAAAAAAAAPA/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAPA/AAAAAAAAAACUhZRSlIwGd2luZG93lGgGQykBAgAAAAIAAABuLYQ3iTLxPxfq7+8wHvA/bi2EN4ky8T+BpmSDSSLwP5SFlFKUdWEu"
+    }
+  ]
+}

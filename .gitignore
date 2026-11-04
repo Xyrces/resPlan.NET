@@ -55,3 +55,7 @@ nunit-*.xml
 .venv/
 test_venv/
 ResPlan.zip
+/ResPlan/
+__pycache__/
+*.pyc
+nupkgs/

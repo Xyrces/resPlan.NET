@@ -42,10 +42,11 @@ namespace ResPlan.Tests
             // Assert
             Assert.Equal(plan.Id, deserialized.Id);
             Assert.NotNull(deserialized.Bounds);
+            Assert.NotNull(deserialized.ReferenceGraph);
             Assert.Equal(plan.Bounds.MinX, deserialized.Bounds.MinX);
             Assert.Equal(plan.ReferenceGraph.Nodes.Count, deserialized.ReferenceGraph.Nodes.Count);
             Assert.Equal(plan.ReferenceGraph.Nodes["n1"].Area, deserialized.ReferenceGraph.Nodes["n1"].Area);
-            Assert.True(plan.ReferenceGraph.Nodes["n1"].Geometry.EqualsExact(deserialized.ReferenceGraph.Nodes["n1"].Geometry));
+            Assert.True(plan.ReferenceGraph.Nodes["n1"].Geometry!.EqualsExact(deserialized.ReferenceGraph.Nodes["n1"].Geometry));
             Assert.Equal(plan.Geometries["walls"][0].ToText(), deserialized.Geometries["walls"][0].ToText());
         }
 
@@ -72,6 +73,7 @@ namespace ResPlan.Tests
             var deserialized = PlanSerializer.Deserialize(bytes);
 
             // Assert
+            Assert.NotNull(deserialized.ReferenceGraph);
             Assert.True(double.IsNaN(deserialized.ReferenceGraph.Nodes["n1"].Area));
             Assert.True(double.IsPositiveInfinity(deserialized.ReferenceGraph.Nodes["n2"].Area));
         }
@@ -97,6 +99,7 @@ namespace ResPlan.Tests
             var deserialized = PlanSerializer.Deserialize(bytes);
 
             // Assert
+            Assert.NotNull(deserialized.ReferenceGraph);
             Assert.Null(deserialized.ReferenceGraph.Nodes["n1"].Geometry);
         }
     }

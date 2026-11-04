@@ -1,154 +1,139 @@
-using System;
-using System.IO;
-using System.Net.Http;
 using System.IO.Compression;
-using System.Threading.Tasks;
+using System.Security.Cryptography;
 
-namespace ResPlan.Library.Data
+namespace ResPlan.Library.Data;
+
+public static class DataManager
 {
-    public static class DataManager
+    private const string DataDir = "ResPlan";
+    private const string PklFile = "ResPlan.pkl";
+    private static readonly HttpClient Client = new() { Timeout = TimeSpan.FromMinutes(15) };
+
+    internal sealed record DatasetSource(
+        Uri ArchiveUri, long ArchiveLength, string ArchiveSha256,
+        string EntryName, long EntryLength, string EntrySha256);
+
+    internal static readonly DatasetSource PinnedSource = new(
+        new Uri("https://raw.githubusercontent.com/m-agour/ResPlan/e2b78fe069aee1ab1e1828a612743f308e3c32a7/ResPlan.zip"),
+        100106537, "f718de8865e51bbe93b49b584798e3c536ed6b4b8a5d32f01b56812f389aeb46",
+        PklFile, 258453658, "103edd854a5f365aa875ed832e6cef0d8bc72c4b34e5df0856c01b6970684cb5");
+
+    /// <summary>Finds an existing dataset or installs the checksum-verified, pinned upstream dataset.</summary>
+    /// <remarks>Existing local datasets are used as-is and are never replaced.</remarks>
+    public static Task EnsureDataAsync(Action<string>? logger = null)
+        => EnsureDataAsync(logger, CancellationToken.None);
+
+    public static Task EnsureDataAsync(Action<string>? logger, CancellationToken cancellationToken)
+        => EnsureDataAsync(Directory.GetCurrentDirectory(), Client, PinnedSource, logger, cancellationToken);
+
+    internal static async Task EnsureDataAsync(string workingDirectory, HttpClient client, DatasetSource source,
+        Action<string>? logger = null, CancellationToken cancellationToken = default)
     {
-        private const string ResPlanUrl = "https://github.com/m-agour/ResPlan/raw/main/ResPlan.zip";
-        private const string DataDir = "ResPlan";
-        private const string PklFile = "ResPlan.pkl";
-
-        public static async Task EnsureDataAsync(Action<string> logger = null)
+        cancellationToken.ThrowIfCancellationRequested();
+        var log = logger ?? Console.WriteLine;
+        string dataPath = GetDataPath(workingDirectory);
+        if (File.Exists(dataPath))
         {
-            var log = logger ?? Console.WriteLine;
-
-            var baseDir = AppDomain.CurrentDomain.BaseDirectory;
-            // Find root where ResPlan folder should be
-            // Similar logic to finding venv, or we just put it relative to execution
-            // But currently code expects ResPlan/ResPlan.pkl relative to CWD usually.
-
-            // Let's assume current directory or search up
-            var workingDir = Directory.GetCurrentDirectory();
-            var dataPath = Path.Combine(workingDir, DataDir, PklFile);
-
-            if (File.Exists(dataPath))
-            {
-                log($"Data found at {dataPath}");
-                return;
-            }
-
-            // Search up just in case
-            var current = new DirectoryInfo(workingDir);
-            while (current != null)
-            {
-                 var checkPath = Path.Combine(current.FullName, DataDir, PklFile);
-                 if (File.Exists(checkPath))
-                 {
-                     log($"Data found at {checkPath}");
-                     return;
-                 }
-                 if (File.Exists(Path.Combine(current.FullName, "ResPlan.slnx")))
-                 {
-                     // Found root, data not found, so we should download to root/ResPlan
-                     workingDir = current.FullName;
-                     break;
-                 }
-                 current = current.Parent;
-            }
-
-            log("ResPlan data not found. Downloading...");
-            var targetDir = Path.Combine(workingDir, DataDir);
-            if (!Directory.Exists(targetDir))
-            {
-                Directory.CreateDirectory(targetDir);
-            }
-
-            var zipPath = Path.Combine(targetDir, "ResPlan.zip");
-
-            using (var client = new HttpClient())
-            {
-                // We should implement progress reporting for download if possible
-                using (var response = await client.GetAsync(ResPlanUrl, HttpCompletionOption.ResponseHeadersRead))
-                {
-                    response.EnsureSuccessStatusCode();
-                    var contentLength = response.Content.Headers.ContentLength;
-
-                    using (var s = await response.Content.ReadAsStreamAsync())
-                    using (var fs = new FileStream(zipPath, FileMode.Create))
-                    {
-                        if (contentLength.HasValue && logger != null)
-                        {
-                            var buffer = new byte[8192];
-                            long totalRead = 0;
-                            int read;
-                            long lastReport = 0;
-                            while ((read = await s.ReadAsync(buffer, 0, buffer.Length)) > 0)
-                            {
-                                await fs.WriteAsync(buffer, 0, read);
-                                totalRead += read;
-                                if (totalRead - lastReport > 1024 * 1024) // report every 1MB
-                                {
-                                    log($"Downloading: {totalRead / 1024 / 1024} MB / {contentLength / 1024 / 1024} MB");
-                                    lastReport = totalRead;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            await s.CopyToAsync(fs);
-                        }
-                    }
-                }
-            }
-
-            log("Extracting...");
-            ZipFile.ExtractToDirectory(zipPath, targetDir, overwriteFiles: true);
-
-            // Verify extraction
-            if (!File.Exists(Path.Combine(targetDir, PklFile)))
-            {
-                 // Maybe it extracts to a subdirectory?
-                 // The zip structure usually contains ResPlan/ResPlan.pkl?
-                 // If the zip contains "ResPlan.pkl" at root, then it is in targetDir/ResPlan.pkl
-                 // If the zip contains "ResPlan/ResPlan.pkl", then it is in targetDir/ResPlan/ResPlan.pkl
-
-                 // Let's check files
-                 var files = Directory.GetFiles(targetDir, "*.pkl", SearchOption.AllDirectories);
-                 if (files.Length > 0)
-                 {
-                     log($"Data extracted to {files[0]}");
-                     // If it is in a subdir, we might want to move it or return the path
-                 }
-                 else
-                 {
-                     throw new FileNotFoundException("ResPlan.pkl not found after extraction.");
-                 }
-            }
-            else
-            {
-                log("Extraction complete.");
-            }
+            log($"Data found at {dataPath}");
+            return;
         }
 
-        public static string GetDataPath()
+        string targetDirectory = Path.GetDirectoryName(dataPath)!;
+        Directory.CreateDirectory(targetDirectory);
+        string archivePath = Path.Combine(targetDirectory, $".ResPlan-{Guid.NewGuid():N}.zip.tmp");
+        string extractedPath = Path.Combine(targetDirectory, $".ResPlan-{Guid.NewGuid():N}.pkl.tmp");
+        try
         {
-             // Logic to find the pkl file
-            var workingDir = Directory.GetCurrentDirectory();
-
-            // First check local relative
-            if (File.Exists(Path.Combine(workingDir, DataDir, PklFile)))
-                return Path.Combine(workingDir, DataDir, PklFile);
-
-             // Search up
-            var current = new DirectoryInfo(workingDir);
-            while (current != null)
+            log("ResPlan data not found. Downloading the pinned dataset...");
+            using (var response = await client.GetAsync(source.ArchiveUri, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
             {
-                 var checkPath = Path.Combine(current.FullName, DataDir, PklFile);
-                 if (File.Exists(checkPath)) return checkPath;
-                 // check deeper nesting if zip extracted with folder
-                 var checkPath2 = Path.Combine(current.FullName, DataDir, "ResPlan", PklFile);
-                 if (File.Exists(checkPath2)) return checkPath2;
-
-                 if (File.Exists(Path.Combine(current.FullName, "ResPlan.slnx"))) break;
-                 current = current.Parent;
+                response.EnsureSuccessStatusCode();
+                if (response.Content.Headers.ContentLength is long length && length != source.ArchiveLength)
+                    throw new InvalidDataException("The archive download has an unexpected length.");
+                await using var input = await response.Content.ReadAsStreamAsync(cancellationToken);
+                await using var output = CreateTemporaryFile(archivePath);
+                await CopyAndVerifyAsync(input, output, source.ArchiveLength, source.ArchiveSha256,
+                    "Downloaded archive", cancellationToken);
             }
 
-            // Default fall back
-            return Path.Combine(workingDir, DataDir, PklFile);
+            log("Archive verified. Extracting ResPlan.pkl...");
+            using (var archive = ZipFile.OpenRead(archivePath))
+            {
+                var entries = archive.Entries.Where(entry => entry.FullName == source.EntryName).ToArray();
+                if (entries.Length != 1)
+                    throw new InvalidDataException($"The dataset archive must contain exactly one '{source.EntryName}' entry.");
+                var entry = entries[0];
+                if (entry.Length != source.EntryLength)
+                    throw new InvalidDataException("The dataset entry has an unexpected uncompressed length.");
+                await using var input = entry.Open();
+                await using var output = CreateTemporaryFile(extractedPath);
+                await CopyAndVerifyAsync(input, output, source.EntryLength, source.EntrySha256,
+                    "Extracted dataset", cancellationToken);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                // The temporary file is on the destination filesystem. Publish only
+                // verified complete data, without replacing a dataset created meanwhile.
+                File.Move(extractedPath, dataPath, overwrite: false);
+                log($"Dataset verified and installed at {dataPath}");
+            }
+            catch (IOException) when (File.Exists(dataPath))
+            {
+                log($"An existing dataset was retained at {dataPath}");
+            }
         }
+        finally
+        {
+            try { File.Delete(archivePath); }
+            finally { File.Delete(extractedPath); }
+        }
+    }
+
+    private static FileStream CreateTemporaryFile(string path) => new(path, FileMode.CreateNew,
+        FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous | FileOptions.SequentialScan);
+
+    private static async Task CopyAndVerifyAsync(Stream input, Stream output, long expectedLength,
+        string expectedSha256, string description, CancellationToken cancellationToken)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        byte[] buffer = new byte[81920];
+        long length = 0;
+        while (true)
+        {
+            int count = await input.ReadAsync(buffer, cancellationToken);
+            if (count == 0) break;
+            if (count > expectedLength - length)
+                throw new InvalidDataException($"{description} exceeds its expected size.");
+            await output.WriteAsync(buffer.AsMemory(0, count), cancellationToken);
+            hash.AppendData(buffer, 0, count);
+            length += count;
+        }
+        if (length != expectedLength)
+            throw new InvalidDataException($"{description} is incomplete or has an unexpected size.");
+        if (!CryptographicOperations.FixedTimeEquals(hash.GetHashAndReset(), Convert.FromHexString(expectedSha256)))
+            throw new InvalidDataException($"{description} SHA-256 does not match the pinned dataset.");
+        await output.FlushAsync(cancellationToken);
+    }
+
+    public static string GetDataPath() => GetDataPath(Directory.GetCurrentDirectory());
+
+    internal static string GetDataPath(string workingDirectory)
+    {
+        string destinationRoot = Path.GetFullPath(workingDirectory);
+        for (var current = new DirectoryInfo(destinationRoot); current is not null; current = current.Parent)
+        {
+            string direct = Path.Combine(current.FullName, DataDir, PklFile);
+            if (File.Exists(direct)) return direct;
+            string nested = Path.Combine(current.FullName, DataDir, DataDir, PklFile);
+            if (File.Exists(nested)) return nested;
+            if (File.Exists(Path.Combine(current.FullName, "ResPlan.slnx")))
+            {
+                destinationRoot = current.FullName;
+                break;
+            }
+        }
+        return Path.Combine(destinationRoot, DataDir, PklFile);
     }
 }

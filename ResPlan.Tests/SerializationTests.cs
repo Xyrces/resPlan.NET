@@ -48,6 +48,7 @@ namespace ResPlan.Tests
                 Assert.NotNull(plans);
                 Assert.Single(plans);
                 var plan = plans[0];
+                Assert.NotNull(plan.ReferenceGraph);
                 var n1 = plan.ReferenceGraph.Nodes["n1"];
                 var n2 = plan.ReferenceGraph.Nodes["n2"];
 

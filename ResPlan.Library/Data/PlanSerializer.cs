@@ -10,6 +10,7 @@ namespace ResPlan.Library.Data
         /// </summary>
         public static byte[] Serialize(Plan plan)
         {
+            ArgumentNullException.ThrowIfNull(plan);
             return MessagePackSerializer.Serialize(plan, ResPlanMessagePackResolver.Options);
         }
 
@@ -18,7 +19,12 @@ namespace ResPlan.Library.Data
         /// </summary>
         public static Plan Deserialize(byte[] bytes)
         {
-            return MessagePackSerializer.Deserialize<Plan>(bytes, ResPlanMessagePackResolver.Options);
+            ArgumentNullException.ThrowIfNull(bytes);
+            var plan = MessagePackSerializer.Deserialize<Plan>(bytes, ResPlanMessagePackResolver.Options)
+                ?? throw new MessagePackSerializationException("The MessagePack payload contains a null plan.");
+            // Legacy payloads encode both missing and empty bounds as nil.
+            plan.Bounds ??= new NetTopologySuite.Geometries.Envelope();
+            return plan;
         }
 
         /// <summary>
