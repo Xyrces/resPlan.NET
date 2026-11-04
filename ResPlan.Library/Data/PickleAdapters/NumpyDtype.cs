@@ -99,8 +99,10 @@ internal sealed class NumpyDtype
         };
         return size switch
         {
-            2 => (double)BitConverter.UInt16BitsToHalf((ushort)bits),
-            4 => (double)BitConverter.Int32BitsToSingle(unchecked((int)bits)),
+            // Box before the switch's common-type inference can widen these
+            // values: NumPy scalar string representations depend on precision.
+            2 => (object)BitConverter.UInt16BitsToHalf((ushort)bits),
+            4 => (object)BitConverter.Int32BitsToSingle(unchecked((int)bits)),
             _ => BitConverter.Int64BitsToDouble(unchecked((long)bits))
         };
     }

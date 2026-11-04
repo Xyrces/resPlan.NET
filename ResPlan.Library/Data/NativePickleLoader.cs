@@ -153,6 +153,10 @@ internal static class NativePickleLoader
             nodes = view.State["_nodes"] as IDictionary;
         if (nodes is null) throw new InvalidDataException("NetworkX Graph is missing its node dictionary.");
 
+        // NetworkX retains the original node key even when an edge is later
+        // added using an equal numeric alias (for example 1, 1.0, or True).
+        var nodeIds = new PickleDictionary();
+        string? nanNodeId = null;
         foreach (DictionaryEntry entry in nodes)
         {
             var id = NodeId(entry.Key);
@@ -165,21 +169,29 @@ internal static class NativePickleLoader
             node.Area = nodeAttributes["area"] is null ? node.Geometry?.Area ?? 0 : Number(nodeAttributes["area"], $"node '{id}' area");
             CopyAttributes(nodeAttributes, node.Metadata, "geometry", "type", "area");
             if (!graph.Nodes.TryAdd(id, node)) throw new InvalidDataException($"NetworkX node IDs collide after conversion: '{id}'.");
+            nodeIds.Add(entry.Key, id);
+            if (IsFloatingNaN(entry.Key)) nanNodeId = id;
         }
+
+        // Plain Python floats are not memoized by pickle, so a single NaN node
+        // can be recreated as distinct NaNs in the adjacency dictionaries.
+        // Multiple NaN nodes already fail the string-ID collision check above.
+        string? ResolveNodeId(object? key) => nodeIds[key] as string
+            ?? (IsFloatingNaN(key) ? nanNodeId : null);
 
         if (source.State["_adj"] is not IDictionary adjacency)
             throw new InvalidDataException("NetworkX Graph is missing its adjacency dictionary.");
         var visited = new HashSet<(string, string)>();
         foreach (DictionaryEntry sourceEntry in adjacency)
         {
-            var sourceId = NodeId(sourceEntry.Key);
-            if (!graph.Nodes.ContainsKey(sourceId) || sourceEntry.Value is not IDictionary neighbors)
-                throw new InvalidDataException($"NetworkX adjacency for '{sourceId}' is invalid.");
+            var sourceId = ResolveNodeId(sourceEntry.Key);
+            if (sourceId is null || sourceEntry.Value is not IDictionary neighbors)
+                throw new InvalidDataException($"NetworkX adjacency for '{NodeId(sourceEntry.Key)}' is invalid.");
             foreach (DictionaryEntry targetEntry in neighbors)
             {
-                var targetId = NodeId(targetEntry.Key);
-                if (!graph.Nodes.ContainsKey(targetId) || targetEntry.Value is not IDictionary edgeAttributes)
-                    throw new InvalidDataException($"NetworkX edge '{sourceId}'—'{targetId}' is invalid.");
+                var targetId = ResolveNodeId(targetEntry.Key);
+                if (targetId is null || targetEntry.Value is not IDictionary edgeAttributes)
+                    throw new InvalidDataException($"NetworkX edge '{sourceId}'—'{NodeId(targetEntry.Key)}' is invalid.");
                 var pair = string.CompareOrdinal(sourceId, targetId) <= 0 ? (sourceId, targetId) : (targetId, sourceId);
                 if (!visited.Add(pair)) continue;
                 var edge = new Edge { SourceId = sourceId, TargetId = targetId, Type = AttributeString(edgeAttributes["type"]) };
@@ -192,12 +204,21 @@ internal static class NativePickleLoader
 
     private static string AttributeString(object? value) => value is null ? "" : NodeId(value);
 
+    private static bool IsFloatingNaN(object? value) => value switch
+    {
+        Half number => Half.IsNaN(number),
+        float number => float.IsNaN(number),
+        double number => double.IsNaN(number),
+        _ => false
+    };
+
     private static string NodeId(object? value) => value switch
     {
         string text => text,
         bool boolean => boolean ? "True" : "False",
         null => "None",
-        float number => FormatPythonFloat(number),
+        Half number => NumpyFloatFormatter.Format(number),
+        float number => NumpyFloatFormatter.Format(number),
         double number => FormatPythonFloat(number),
         sbyte or byte or short or ushort or int or uint or long or ulong or BigInteger
             => Convert.ToString(value, CultureInfo.InvariantCulture)!,
@@ -242,6 +263,7 @@ internal static class NativePickleLoader
     {
         bool boolean => boolean ? 1 : 0,
         BigInteger integer => (double)integer,
+        Half number => (double)number,
         sbyte or byte or short or ushort or int or uint or long or ulong or float or double
             => Convert.ToDouble(value, CultureInfo.InvariantCulture),
         _ => throw new InvalidDataException($"'{name}' must be numeric.")
@@ -262,7 +284,11 @@ internal static class NativePickleLoader
     private static object? NormalizeMetadata(object? value, HashSet<object> ancestors, int depth)
     {
         if (depth > 256) throw new InvalidDataException("Metadata is nested too deeply.");
-        if (value is null or bool or string or sbyte or byte or short or ushort or int or uint or long or ulong or float or double or byte[])
+        // Scalar precision is needed for graph identifiers, but public metadata
+        // keeps the same double values exposed before retaining that precision.
+        if (value is Half half) return (double)half;
+        if (value is float single) return (double)single;
+        if (value is null or bool or string or sbyte or byte or short or ushort or int or uint or long or ulong or double or byte[])
             return value;
         if (value is PickleByteArray byteArray) return byteArray.Data;
         if (value is PickleBuffer buffer) return buffer.Data.ToArray();

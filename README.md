@@ -64,6 +64,7 @@ var plans = await PlanLoader.LoadPlansAsync(
 - `Metadata` retains nongeometry fields such as `unitType`, `area`, `net_area`, and `wall_depth`. It supports scalar values, byte buffers, arrays, and dictionaries with string keys. Unsupported values cause a descriptive error rather than disappearing.
 - `WallWidth` controls graph buffering and defaults to `0.1`. A zero value uses the same fallback. `wall_depth` remains separate metadata; it is not substituted for `wall_width`.
 - `ReferenceGraph` is generated from the plan geometry, matching the former loader's behavior. It is not an independent ground-truth graph. When a pickle contains a NetworkX graph, `SourceGraph` retains it separately, including node, edge, and graph attributes.
+- Stored graph IDs retain the original Python/NumPy scalar spelling. Numerically equal edge endpoints (such as `1`, `1.0`, and `True`) resolve to the original node before conversion. Distinct nodes whose IDs genuinely collide after string conversion are rejected.
 - `Bounds` covers visible rooms, walls, openings, and semantic anchor categories, with a fallback to all geometry for plans without those categories. Auxiliary neighboring plots do not normally expand the viewport.
 
 ```csharp

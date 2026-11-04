@@ -87,11 +87,16 @@ def graph_snapshot(graph):
     if not isinstance(graph, nx.Graph) or graph.is_directed() or graph.is_multigraph():
         raise TypeError("Expected an undirected NetworkX Graph")
     nodes = {}
+    identifiers = {}
+    nan_identifier = None
     for key, attrs in graph.nodes(data=True):
         geometry = attrs.get("geometry")
         identifier = str(key)
         if identifier in nodes:
             raise ValueError(f"Node IDs collide after string conversion: {identifier}")
+        identifiers[key] = identifier
+        if isinstance(key, (float, np.floating)) and math.isnan(key):
+            nan_identifier = identifier
         area = attrs.get("area")
         nodes[identifier] = {
             "id": identifier,
@@ -100,10 +105,26 @@ def graph_snapshot(graph):
             "geometry": geometry_hash(geometry),
             "metadata": metadata({key: value for key, value in attrs.items() if key not in {"geometry", "type", "area"}}),
         }
+    def canonical_identifier(key):
+        # Resolve aliases (1, 1.0, True, NumPy scalars) using Python dictionary
+        # equality before converting the node's original key to its public ID.
+        if key in identifiers:
+            return identifiers[key]
+        # Built-in NaN floats are not memoized by pickle. Only a single numeric
+        # NaN node is representable by the public string IDs checked above.
+        if nan_identifier is not None and isinstance(key, (float, np.floating)) and math.isnan(key):
+            return nan_identifier
+        raise ValueError(f"Edge endpoint is absent from the node dictionary: {key!r}")
+
     edges = []
+    visited = set()
     for source, target, attrs in graph.edges(data=True):
         # UTF-16 ordinal ordering matches the public .NET string ID convention.
-        source, target = sorted((str(source), str(target)), key=lambda text: text.encode("utf-16-be", "surrogatepass"))
+        source, target = sorted((canonical_identifier(source), canonical_identifier(target)),
+                                key=lambda text: text.encode("utf-16-be", "surrogatepass"))
+        if (source, target) in visited:
+            continue
+        visited.add((source, target))
         edges.append({
             "source": source,
             "target": target,

@@ -35,6 +35,19 @@ count, selected count, and numeric tolerances. `--max-plans N` generates an
 explicitly labeled prefix for debugging. The validator reports that prefix
 and the original total separately.
 
+The native test suite also reads committed CPython-generated graph identifier
+fixtures covering protocols 0–5, numeric key aliases, NumPy float16/float32
+precision, and MessagePack round trips. Regenerate these trusted fixtures with:
+
+```bash
+.venv/bin/python tools/generate_graph_identifier_fixtures.py
+```
+
+Their manifest records the generator hash and Python, NumPy, and NetworkX
+versions. Expected endpoints resolve through Python key equality against the
+original node keys. NumPy ID spelling follows the pinned oracle version;
+metadata retains the exact widened numeric value separately from its ID.
+
 For the full trusted dataset, keep the large input and generated oracle outside
 the repository. The validated 17,000-plan `ResPlan.pkl` is 258,453,658 bytes with
 SHA-256 `103edd854a5f365aa875ed832e6cef0d8bc72c4b34e5df0856c01b6970684cb5`:
@@ -67,5 +80,9 @@ dotnet run --project tools/ResPlan.Validation -c Release -- \
   source graphs, and graph attributes are compared. Only computed node areas
   permit `1e-10 + 1e-12 * max(abs(expected), abs(actual))` error because GEOS and
   NetTopologySuite can sum polygon areas in different orders.
+- Stored graph endpoints use their original node's ID, even when the edge uses
+  a numerically equal key of another scalar type. A single numeric NaN node is
+  supported even when pickle recreates separate NaN objects in adjacency maps;
+  distinct nodes with the same string ID remain an error.
 - MessagePack round trips use the same complete snapshot with **zero numeric
   tolerance**, including graph areas. These checks run on every selected plan.
