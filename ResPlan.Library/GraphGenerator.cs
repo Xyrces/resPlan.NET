@@ -9,6 +9,9 @@ namespace ResPlan.Library
     {
         private static readonly List<string> RoomTypes = new List<string> { "living", "kitchen", "bedroom", "bathroom", "balcony" };
         private static readonly double BufferFactor = 0.75;
+        // Shapely's geometry.buffer() uses 16 segments per quadrant; NTS defaults
+        // to 8, which can omit intersections close to a rounded buffer boundary.
+        private const int BufferQuadrantSegments = 16;
 
         public static Graph GenerateGraph(Plan plan)
         {
@@ -87,7 +90,7 @@ namespace ResPlan.Library
                 {
                     var genGeom = G.Nodes[gen].Geometry!;
                     // Python: fd_geom.intersects(gen_geom.buffer(buf))
-                    if (fdGeom.Intersects(genGeom.Buffer(buf)))
+                    if (fdGeom.Intersects(genGeom.Buffer(buf, BufferQuadrantSegments)))
                     {
                         AddEdge(G, fd, gen, "direct");
                     }
@@ -100,11 +103,12 @@ namespace ResPlan.Library
             {
                 foreach (var rn in nodesByType[roomType])
                 {
-                    var rGeomBuffered = G.Nodes[rn].Geometry!.Buffer(buf).Buffer(buf);
+                    var rGeomBuffered = G.Nodes[rn].Geometry!.Buffer(buf, BufferQuadrantSegments)
+                        .Buffer(buf, BufferQuadrantSegments);
                     foreach (var gen in nodesByType["living"])
                     {
                         // Preserve the reference's two room buffers and one living buffer.
-                        var genGeomBuffered = G.Nodes[gen].Geometry!.Buffer(buf);
+                        var genGeomBuffered = G.Nodes[gen].Geometry!.Buffer(buf, BufferQuadrantSegments);
 
                         if (rGeomBuffered.Intersects(genGeomBuffered))
                         {
@@ -120,7 +124,7 @@ namespace ResPlan.Library
             {
                 foreach (var rn in nodesByType[roomType])
                 {
-                    var rGeom = G.Nodes[rn].Geometry!.Buffer(buf);
+                    var rGeom = G.Nodes[rn].Geometry!.Buffer(buf, BufferQuadrantSegments);
                     foreach (var conn in conns)
                     {
                         if (!conn.Geom.Intersects(rGeom)) continue;
@@ -129,7 +133,7 @@ namespace ResPlan.Library
                         {
                             foreach (var tn in nodesByType[targetType])
                             {
-                                var tGeom = G.Nodes[tn].Geometry!.Buffer(buf);
+                                var tGeom = G.Nodes[tn].Geometry!.Buffer(buf, BufferQuadrantSegments);
                                 if (conn.Geom.Intersects(tGeom))
                                 {
                                     AddEdge(G, rn, tn, conn.Type);

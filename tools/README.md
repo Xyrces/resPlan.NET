@@ -58,6 +58,19 @@ versions. Regenerate them with:
 .venv/bin/python tools/generate_empty_geometry_fixtures.py
 ```
 
+Rounded-buffer graph fixtures cover direct entrance edges, room adjacency,
+and door/window connections on both source and target room boundaries. Their
+expected graphs come from `resplan_utils.plan_to_graph`; each positive case
+loses its edge with eight buffer segments per quadrant, while the reference's
+sixteen segments retain it. Nearby negative cases check that edges remain absent.
+Tests load the CPython payloads and check generated graphs before and after
+MessagePack. The manifest includes generator/reference hashes and library
+versions. Regenerate them with:
+
+```bash
+.venv/bin/python tools/generate_graph_buffer_fixtures.py
+```
+
 For the full trusted dataset, keep the large input and generated oracle outside
 the repository. The validated 17,000-plan `ResPlan.pkl` is 258,453,658 bytes with
 SHA-256 `103edd854a5f365aa875ed832e6cef0d8bc72c4b34e5df0856c01b6970684cb5`:
