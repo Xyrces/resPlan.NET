@@ -11,31 +11,41 @@ namespace ResPlan.Library
     public class ResPlanData
     {
         public int Id { get; set; }
-        public Dictionary<string, List<string>> Geometries { get; set; }
-        public double[] Bounds { get; set; }
+        public Dictionary<string, List<string>> Geometries { get; set; } = new();
+        public double[]? Bounds { get; set; }
+
+        [JsonPropertyName("wall_width")]
+        public double WallWidth { get; set; } = 0.1;
+        public Dictionary<string, object?> Metadata { get; set; } = new();
+
+        [JsonPropertyName("source_graph")]
+        public GraphData? SourceGraph { get; set; }
 
         [JsonPropertyName("reference_graph")]
-        public GraphData ReferenceGraph { get; set; }
+        public GraphData? ReferenceGraph { get; set; }
     }
 
     public class GraphData
     {
-        public List<NodeData> Nodes { get; set; }
-        public List<EdgeData> Edges { get; set; }
+        public List<NodeData> Nodes { get; set; } = new();
+        public List<EdgeData> Edges { get; set; } = new();
+        public Dictionary<string, object?> Metadata { get; set; } = new();
     }
 
     public class NodeData
     {
-        public string Id { get; set; }
-        public string Type { get; set; }
+        public string Id { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
         public double? Area { get; set; }
+        public Dictionary<string, object?> Metadata { get; set; } = new();
     }
 
     public class EdgeData
     {
-        public string Source { get; set; }
-        public string Target { get; set; }
-        public string Type { get; set; }
+        public string Source { get; set; } = string.Empty;
+        public string Target { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+        public Dictionary<string, object?> Metadata { get; set; } = new();
     }
 
     [MessagePackObject]
@@ -48,14 +58,23 @@ namespace ResPlan.Library
 
         [JsonConverter(typeof(EnvelopeJsonConverter))]
         [Key(2)]
-        public Envelope Bounds { get; set; }
+        public Envelope Bounds { get; set; } = new();
 
         [Key(3)]
-        public Graph ReferenceGraph { get; set; }
+        public Graph? ReferenceGraph { get; set; }
 
-        public Coordinate GetEntrance()
+        [Key(4)]
+        public double WallWidth { get; set; } = 0.1;
+
+        [Key(5)]
+        public Dictionary<string, object?> Metadata { get; set; } = new();
+
+        [Key(6)]
+        public Graph? SourceGraph { get; set; }
+
+        public Coordinate? GetEntrance()
         {
-            List<Geometry> candidates = null;
+            List<Geometry>? candidates = null;
 
             if (Geometries.TryGetValue("front_door", out var doors) && doors.Any())
             {
@@ -127,29 +146,35 @@ namespace ResPlan.Library
         public Dictionary<string, Node> Nodes { get; set; } = new Dictionary<string, Node>();
         [Key(1)]
         public List<Edge> Edges { get; set; } = new List<Edge>();
+        [Key(2)]
+        public Dictionary<string, object?> Metadata { get; set; } = new();
     }
 
     [MessagePackObject]
     public class Node
     {
         [Key(0)]
-        public string Id { get; set; }
+        public string Id { get; set; } = string.Empty;
         [Key(1)]
-        public string Type { get; set; }
+        public string Type { get; set; } = string.Empty;
         [Key(2)]
-        public Geometry Geometry { get; set; }
+        public Geometry? Geometry { get; set; }
         [Key(3)]
         public double Area { get; set; }
+        [Key(4)]
+        public Dictionary<string, object?> Metadata { get; set; } = new();
     }
 
     [MessagePackObject]
     public class Edge
     {
         [Key(0)]
-        public string SourceId { get; set; }
+        public string SourceId { get; set; } = string.Empty;
         [Key(1)]
-        public string TargetId { get; set; }
+        public string TargetId { get; set; } = string.Empty;
         [Key(2)]
-        public string Type { get; set; }
+        public string Type { get; set; } = string.Empty;
+        [Key(3)]
+        public Dictionary<string, object?> Metadata { get; set; } = new();
     }
 }

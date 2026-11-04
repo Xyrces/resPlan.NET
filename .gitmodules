@@ -1,0 +1,3 @@
+[submodule "extern/Pickle.Net"]
+	path = extern/Pickle.Net
+	url = https://github.com/Xyrces/Pickle.Net.git

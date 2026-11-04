@@ -1,4 +1,10 @@
 <Solution>
+  <Folder Name="/Dependencies/">
+    <Project Path="extern/Pickle.Net/src/Pickle.Net/Pickle.Net.csproj" />
+  </Folder>
+  <Folder Name="/Tools/">
+    <Project Path="tools/ResPlan.Validation/ResPlan.Validation.csproj" />
+  </Folder>
   <Project Path="ResPlan.Demo/ResPlan.Demo.csproj" />
   <Project Path="ResPlan.Library/ResPlan.Library.csproj" />
   <Project Path="ResPlan.Tests/ResPlan.Tests.csproj" />

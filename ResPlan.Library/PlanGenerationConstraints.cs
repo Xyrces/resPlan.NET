@@ -6,6 +6,6 @@ namespace ResPlan.Library
 {
     public class PlanGenerationConstraints
     {
-        public Polygon BoundingPolygon { get; set; }
+        public Polygon? BoundingPolygon { get; set; }
     }
 }

@@ -1,0 +1,41 @@
+name: Full dataset compatibility
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - name: Install reference-only Python dependencies
+        run: python -m pip install -r tools/requirements-validation.txt
+      - name: Download and verify pinned dataset
+        run: |
+          mkdir validation
+          curl --fail --location --retry 3 https://raw.githubusercontent.com/m-agour/ResPlan/e2b78fe069aee1ab1e1828a612743f308e3c32a7/ResPlan.zip --output validation/ResPlan.zip
+          printf '%s  %s\n' f718de8865e51bbe93b49b584798e3c536ed6b4b8a5d32f01b56812f389aeb46 validation/ResPlan.zip | sha256sum --check
+          unzip validation/ResPlan.zip -d validation
+      - name: Generate independent reference
+        run: python tools/generate_reference.py --input validation/ResPlan.pkl --output validation/expected.jsonl
+      - name: Verify native loading and MessagePack round trips
+        run: dotnet run --project tools/ResPlan.Validation -c Release -- validation/ResPlan.pkl validation/expected.jsonl --report validation/native-report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: full-dataset-validation
+          path: validation/native-report.json

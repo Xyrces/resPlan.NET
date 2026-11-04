@@ -8,13 +8,14 @@ namespace ResPlan.Library
     public class GraphGenerator
     {
         private static readonly List<string> RoomTypes = new List<string> { "living", "kitchen", "bedroom", "bathroom", "balcony" };
-        private static readonly double WallWidth = 0.1;
         private static readonly double BufferFactor = 0.75;
 
         public static Graph GenerateGraph(Plan plan)
         {
             var G = new Graph();
-            double buf = Math.Max(WallWidth * BufferFactor, 0.01);
+            // Python treats a missing or zero wall width as the default width.
+            double wallWidth = plan.WallWidth == 0 ? 0.1 : plan.WallWidth;
+            double buf = Math.Max(wallWidth * BufferFactor, 0.01);
 
             var nodesByType = new Dictionary<string, List<string>>();
             foreach (var type in RoomTypes) nodesByType[type] = new List<string>();
@@ -25,7 +26,7 @@ namespace ResPlan.Library
             {
                 if (plan.Geometries.ContainsKey(roomType))
                 {
-                    var geoms = plan.Geometries[roomType];
+                    var geoms = GeometryParts.Enumerate(plan.Geometries[roomType]).ToList();
                     for (int i = 0; i < geoms.Count; i++)
                     {
                         var geom = geoms[i];
@@ -48,7 +49,7 @@ namespace ResPlan.Library
 
             if (plan.Geometries.ContainsKey("front_door"))
             {
-                var geoms = plan.Geometries["front_door"];
+                var geoms = GeometryParts.Enumerate(plan.Geometries["front_door"]).ToList();
                 for (int i = 0; i < geoms.Count; i++)
                 {
                     var geom = geoms[i];
@@ -67,22 +68,24 @@ namespace ResPlan.Library
             }
 
             // Helper to get geometries
-            List<Geometry> doors = plan.Geometries.ContainsKey("door") ? plan.Geometries["door"] : new List<Geometry>();
-            List<Geometry> windows = plan.Geometries.ContainsKey("window") ? plan.Geometries["window"] : new List<Geometry>();
+            var doors = plan.Geometries.TryGetValue("door", out var doorGeometries)
+                ? GeometryParts.Enumerate(doorGeometries) : Enumerable.Empty<Geometry>();
+            var windows = plan.Geometries.TryGetValue("window", out var windowGeometries)
+                ? GeometryParts.Enumerate(windowGeometries) : Enumerable.Empty<Geometry>();
 
             var conns = new List<(Geometry Geom, string Type)>();
-            doors.ForEach(d => conns.Add((d, "via_door")));
-            windows.ForEach(w => conns.Add((w, "via_window")));
+            conns.AddRange(doors.Select(d => (d, "via_door")));
+            conns.AddRange(windows.Select(w => (w, "via_window")));
 
             // 2. Edges
 
             // front_door -> living (direct)
             foreach (var fd in nodesByType["front_door"])
             {
-                var fdGeom = G.Nodes[fd].Geometry;
+                var fdGeom = G.Nodes[fd].Geometry!;
                 foreach (var gen in nodesByType["living"])
                 {
-                    var genGeom = G.Nodes[gen].Geometry;
+                    var genGeom = G.Nodes[gen].Geometry!;
                     // Python: fd_geom.intersects(gen_geom.buffer(buf))
                     if (fdGeom.Intersects(genGeom.Buffer(buf)))
                     {
@@ -97,13 +100,11 @@ namespace ResPlan.Library
             {
                 foreach (var rn in nodesByType[roomType])
                 {
-                    var rGeom = G.Nodes[rn].Geometry.Buffer(buf);
+                    var rGeomBuffered = G.Nodes[rn].Geometry!.Buffer(buf).Buffer(buf);
                     foreach (var gen in nodesByType["living"])
                     {
-                        var genGeom = G.Nodes[gen].Geometry;
-                        // Python logic imitation
-                        var rGeomBuffered = G.Nodes[rn].Geometry.Buffer(buf).Buffer(buf);
-                        var genGeomBuffered = G.Nodes[gen].Geometry.Buffer(buf);
+                        // Preserve the reference's two room buffers and one living buffer.
+                        var genGeomBuffered = G.Nodes[gen].Geometry!.Buffer(buf);
 
                         if (rGeomBuffered.Intersects(genGeomBuffered))
                         {
@@ -119,7 +120,7 @@ namespace ResPlan.Library
             {
                 foreach (var rn in nodesByType[roomType])
                 {
-                    var rGeom = G.Nodes[rn].Geometry.Buffer(buf);
+                    var rGeom = G.Nodes[rn].Geometry!.Buffer(buf);
                     foreach (var conn in conns)
                     {
                         if (!conn.Geom.Intersects(rGeom)) continue;
@@ -128,7 +129,7 @@ namespace ResPlan.Library
                         {
                             foreach (var tn in nodesByType[targetType])
                             {
-                                var tGeom = G.Nodes[tn].Geometry.Buffer(buf);
+                                var tGeom = G.Nodes[tn].Geometry!.Buffer(buf);
                                 if (conn.Geom.Intersects(tGeom))
                                 {
                                     AddEdge(G, rn, tn, conn.Type);
@@ -152,6 +153,31 @@ namespace ResPlan.Library
             if (!exists)
             {
                 G.Edges.Add(new Edge { SourceId = u, TargetId = v, Type = type });
+            }
+        }
+    }
+
+    internal static class GeometryParts
+    {
+        internal static IEnumerable<Geometry> Enumerate(IEnumerable<Geometry>? geometries)
+        {
+            if (geometries == null) yield break;
+
+            foreach (var geometry in geometries)
+            {
+                if (geometry == null || geometry.IsEmpty) continue;
+
+                if (geometry is GeometryCollection collection)
+                {
+                    foreach (var part in Enumerate(collection.Geometries))
+                    {
+                        yield return part;
+                    }
+                }
+                else
+                {
+                    yield return geometry;
+                }
             }
         }
     }

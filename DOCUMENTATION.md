@@ -1,196 +1,67 @@
-# ResPlan.NET Documentation
+# Architecture and migration notes
 
-This document provides a comprehensive technical overview of the ResPlan.NET library, including its architecture, internal data loading mechanisms, and data models. It is designed to provide AI agents and developers with deep context on the system's operation.
+## Runtime flow
 
-## Architecture Overview
+`PlanLoader` reads JSON directly or opens the pickle with `NativePickleLoader`. The latter uses Pickle.Net's stack-machine decoder and an explicit ResPlan constructor registry. Shapely WKB becomes NetTopologySuite geometry; NumPy scalar buffers become CLR values; NetworkX instance state becomes a separate `SourceGraph`. Unknown globals fail during decoding. There are no subprocesses, Python packages, or automatic runtime dependency installation.
 
-ResPlan.NET bridges .NET and Python to leverage the specific data format of the ResPlan dataset. The core library (`ResPlan.Library`) handles the high-level logic, object modeling, graph generation, and rendering in .NET, while delegating the complex parsing of the original `.pkl` data files to a Python subprocess.
+The public five-argument `LoadPlansAsync` signature and synchronous JSON entry point remain available. A cancellation-token overload is added. The removed `PythonEnvManager` was an implementation-specific public helper; callers that explicitly invoked it should remove those calls. No replacement is required.
 
-```mermaid
-graph TD
-    subgraph DotNet ["ResPlan.Library (.NET)"]
-        PL[PlanLoader]
-        GG[GraphGenerator]
-        PR[PlanRenderer]
-        Models[Data Models]
-        PEM[PythonEnvManager]
-    end
+The previous Python bridge replaced source IDs with input indices and retained only nine geometry categories. The native loader retains the indices in `Id`, exposes the original identifier in metadata, and preserves all geometry categories. Semantic anchor categories now participate in bounds and constraints. Containment uses the same visible/anchor category selection as the native viewport, with an all-geometry fallback only when those categories are empty; neighboring plots do not inconsistently affect the precise check. `ReferenceGraph` continues to mean the graph generated from geometry; `SourceGraph` exposes the stored NetworkX graph when present.
 
-    subgraph Python ["Python Infrastructure"]
-        Wrapper[resplan_loader_wrapper.py]
-        Loader[resplan_loader.py]
-        Venv[(Virtual Env)]
-    end
+`GraphGenerator` mirrors the local reference algorithm in `resplan_utils.py`, including its double-buffer step for room adjacency and per-plan `wall_width`. The graph uses room polygons and front-door geometries as nodes, with direct, adjacency, via-door, and via-window edges. Multipart connectors are evaluated individually. Rendering uses a uniform scale that fits both requested canvas dimensions.
 
-    subgraph DataSource ["Data Source"]
-        Pkl[Data.pkl]
-    end
+## Dataset provenance
 
-    PL -->|Executes via Subprocess| Wrapper
-    Wrapper -->|Imports| Loader
-    Loader -->|Reads| Pkl
-    Wrapper -->|Streams JSON| PL
-    PL -->|Deserializes to| Models
-    GG -->|Consumes| Models
-    PR -->|Consumes| Models
-    PL -.->|Manages| PEM
-    PEM -.->|Configures| Venv
+Automatic downloads use the immutable upstream revision:
+
+- Repository: https://github.com/m-agour/ResPlan
+- Revision: `e2b78fe069aee1ab1e1828a612743f308e3c32a7`
+- Archive: `ResPlan.zip`, 100,106,537 bytes
+- Archive SHA-256: `f718de8865e51bbe93b49b584798e3c536ed6b4b8a5d32f01b56812f389aeb46`
+- Pickle: `ResPlan.pkl`, 258,453,658 bytes, 17,000 records
+- Pickle SHA-256: `103edd854a5f365aa875ed832e6cef0d8bc72c4b34e5df0856c01b6970684cb5`
+
+The pickle references Shapely's WKB constructor, NumPy's scalar constructor, and `numpy.dtype`. The older committed two-plan sample also references NetworkX `Graph` and `NodeView`. It therefore exercises adapters that the current complete dataset does not use.
+
+Download verification happens before extraction. The loader only installs the expected pickle entry and uses temporary files before committing a completed download. Explicit local datasets are not forced to match the pinned dataset, but must satisfy the native adapter and resource limits.
+
+## MessagePack
+
+Existing integer keys 0–3 on `Plan` are retained. New keys are appended: 4=`WallWidth`, 5=`Metadata`, 6=`SourceGraph`. Metadata fields are also appended to graph/node/edge records. Old records receive model defaults. Geometry remains a MessagePack binary field containing WKB, now written as EWKB to retain SRID and XYZM data. Readers accept old WKB. Typed geometry formatters validate the requested type; standalone typed `LinearRing` values are reconstructed as rings.
+
+MessagePack 3.1.12 and its `UntrustedData` protections are used. Standard resource protections do not replace application-level size/time limits for NetTopologySuite geometry processing.
+
+## Packaging
+
+`extern/Pickle.Net` is a Git submodule pinned to a reviewed commit. The project reference enables a clean source checkout to build without a published package. `dotnet pack` records a dependency on the Pickle.Net package; it does not copy its source or silently embed its assembly.
+
+Build/package both projects. A package consumer needs a NuGet source containing **both** resulting packages, as well as NuGet.org for transitive dependencies. For a private local smoke test, a consumer-local `NuGet.Config` can declare the artifact directory and `https://api.nuget.org/v3/index.json`. No Python content is included in the ResPlan.NET package.
+
+The separately dispatched **Full dataset compatibility** workflow downloads the pinned archive, verifies its digest, generates the independent Python oracle, and compares every record and MessagePack round trip. The normal CI matrix runs the committed fixture suite on Linux and Windows, on .NET 9 and .NET 10, and uploads both packages as artifacts. Registry publication requires a workflow dispatch on `main` with `publish` enabled. It first verifies that Pickle.Net 0.1.0 is available from the GitHub Packages feed, then publishes only ResPlan.NET. Pickle.Net must be released from its own repository: GitHub's repository-scoped workflow token cannot publish a package associated with a different repository. See [GitHub's NuGet authentication documentation](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-nuget-registry#authenticating-to-github-packages). Fork pull requests require no package-write credentials or dataset download.
+
+## Verification
+
+Run the native suite with:
+
+```sh
+dotnet test ResPlan.Tests/ResPlan.Tests.csproj -c Release
 ```
 
-## Internal Mechanisms
+The full-dataset oracle and native comparison utility live in `tools/`. They compare geometry coordinates through normalized WKB hashes, preserved metadata, bounds, generated graph topology/areas, and stored graph data. Full dataset outputs are local validation artifacts and are not committed. Python is used only to establish an independent reference for trusted fixture data; it is never invoked by the library or the native test suite.
 
-### Data Loading (Python Integration)
+The committed oracle for the two-plan sample also exercises stored NetworkX graphs. Compare it without Python:
 
-The `PlanLoader` does not parse the `.pkl` files directly in C#. Instead, it orchestrates a Python subprocess to perform this task. This ensures compatibility with the original data format without reimplementing complex `pickle` logic in .NET.
-
-**Process Flow:**
-1.  **Dependency Check**: `PythonEnvManager` ensures a local virtual environment exists and required packages (e.g., `shapely`, `networkx`, `numpy`) are installed. It streams progress (e.g., pip install output) via a provided logger.
-2.  **Execution**: `PlanLoader` invokes `resplan_loader_wrapper.py` using the Python interpreter from the virtual environment.
-3.  **Data Streaming**: The Python script loads the `.pkl` data, converts it to a clean JSON structure, and prints it to `stdout`.
-4.  **Deserialization**: `PlanLoader` captures `stdout`, extracts the JSON payload, and deserializes it into `ResPlanData` C# objects, which are then converted to the rich `Plan` domain model.
-
-```mermaid
-sequenceDiagram
-    participant App as User App
-    participant PL as PlanLoader
-    participant PEM as PythonEnvManager
-    participant Py as Python Subprocess
-    participant Data as Data File (.pkl)
-
-    App->>PL: LoadPlansAsync(logger)
-    PL->>PEM: EnsureDependencies(logger)
-    PEM-->>App: Stream "Installing dependencies..."
-    PEM->>PEM: Check/Create Venv
-    PEM-->>PL: Ready
-    PL->>Py: Start Process (wrapper.py)
-    Py->>Data: Load Pickle Data
-    Data-->>Py: Raw Objects
-    Py->>Py: Convert to JSON
-    Py-->>PL: Stream JSON to StdOut
-    PL->>PL: Parse JSON & Convert to Plan Objects
-    PL-->>App: List<Plan>
+```sh
+dotnet run --project tools/ResPlan.Validation -c Release -- ResPlan.Tests/sample.pkl tools/fixtures/sample.expected.jsonl
 ```
 
-## Data Models
+For the complete dataset, install the development-only Python dependencies from `tools/requirements-validation.txt` into a virtual environment, then run:
 
-The library uses a set of rich domain models to represent floorplans and their connectivity graphs.
-
-### Class Diagram
-
-```mermaid
-classDiagram
-    class Plan {
-        +int Id
-        +Dictionary Geometries
-        +Envelope Bounds
-        +Graph ReferenceGraph
-        +Coordinate GetEntrance()
-    }
-
-    class PlanGenerationConstraints {
-        +Polygon BoundingPolygon
-    }
-
-    class Graph {
-        +Dictionary Nodes
-        +List~Edge~ Edges
-    }
-
-    class Node {
-        +string Id
-        +string Type
-        +Geometry Geometry
-        +double Area
-    }
-
-    class Edge {
-        +string SourceId
-        +string TargetId
-        +string Type
-    }
-
-    class Geometry {
-        <<NetTopologySuite>>
-    }
-
-    Plan "1" *-- "1" Graph : ReferenceGraph
-    Plan "1" o-- "*" Geometry : Contains
-    Graph "1" *-- "*" Node
-    Graph "1" *-- "*" Edge
-    Node "1" o-- "1" Geometry
+```sh
+python tools/generate_reference.py --input /data/ResPlan.pkl --output /tmp/resplan-expected.jsonl
+dotnet run --project tools/ResPlan.Validation -c Release -- /data/ResPlan.pkl /tmp/resplan-expected.jsonl --report /tmp/resplan-validation.json
 ```
 
-### Type Definitions
+Only run the Python oracle on trusted data: Python's unpickler can execute code. The native comparison verifies the input hash against the oracle manifest and exits nonzero on mismatch. Coordinates and topology must match exactly; graph areas alone allow an absolute tolerance of `1e-10` plus a relative tolerance of `1e-12` for geometry-engine floating-point summation. Every validated plan also undergoes a MessagePack round trip with exact numeric comparison. The manifest records Python, Shapely, GEOS, NumPy and NetworkX versions; the report records counts, timings, memory usage and any differences.
 
-*   **`Plan`**: The root object representing a single floorplan.
-    *   `Geometries`: A dictionary mapping category names (e.g., "living", "wall", "door") to lists of NetTopologySuite `Geometry` objects.
-    *   `Bounds`: The spatial bounding box of the plan.
-    *   `ReferenceGraph`: The ground-truth graph provided by the dataset (if available).
-    *   `GetEntrance()`: Returns the coordinate of the plan's entrance (front door), or null if not found.
-*   **`PlanGenerationConstraints`**: Configuration for filtering loaded plans.
-    *   `BoundingPolygon`: A polygon that must fully contain the plan's bounds.
-*   **`Graph`**: Represents the connectivity graph of the floorplan.
-    *   Generated by `GraphGenerator` or loaded as `ReferenceGraph`.
-*   **`Node`**: A node in the graph, typically representing a room or a portal (door/window).
-    *   `Type`: The semantic type (e.g., "living", "kitchen").
-    *   `Geometry`: The specific geometry associated with this node.
-*   **`Edge`**: A connection between two nodes.
-    *   `Type`: The nature of the connection (e.g., "adjacency", "direct").
-
-## API Reference
-
-### `ResPlan.Library.PlanLoader`
-
-Handles the loading of plan data.
-
-*   `static Task<List<Plan>> LoadPlansAsync(string jsonPath = null, string pklPathOverride = null, int? maxItems = null, Action<string> logger = null, PlanGenerationConstraints constraints = null)`
-    *   **jsonPath**: Optional path to a pre-converted JSON file. If provided, skips Python execution.
-    *   **pklPathOverride**: Optional path to a specific `.pkl` file. If null, defaults to the managed dataset path.
-    *   **maxItems**: Optional limit on the number of plans to load.
-    *   **logger**: Optional callback to receive real-time progress updates (e.g., dependency installation logs, download progress).
-    *   **constraints**: Optional `PlanGenerationConstraints` to filter plans.
-        *   **BoundingPolygon**: If set, only plans whose geometry is completely contained within this polygon are returned. The check first validates the plan's Axis-Aligned Bounding Box (AABB) for performance, and if that fails, performs a precise geometry-by-geometry containment check.
-    *   **Returns**: A list of `Plan` objects.
-
-### `ResPlan.Library.Data.PlanSerializer`
-
-Helper class for binary serialization using MessagePack.
-
-*   `static byte[] Serialize(Plan plan)` / `static Plan Deserialize(byte[] bytes)`
-    *   Serializes/Deserializes `Plan` objects to/from MessagePack binary format.
-    *   **Features**:
-        *   Supports `double.NaN` and `double.Infinity` (unlike standard JSON).
-        *   Uses custom formatters for `NetTopologySuite.Geometries.Geometry` (WKB format) and `Envelope`.
-*   `static void SaveToFile(Plan plan, string filePath)` / `static Plan LoadFromFile(string filePath)`
-    *   Convenience wrappers for file I/O.
-
-### `ResPlan.Library.GraphGenerator`
-
-Generates connectivity graphs from `Plan` geometries.
-
-*   `static Graph GenerateGraph(Plan plan)`
-    *   Analyzes geometry intersections and adjacencies to build a graph.
-    *   **Logic**:
-        *   Creates nodes for all rooms, doors, and windows.
-        *   Connects "front_door" to "living" if they intersect (buffered).
-        *   Connects rooms (kitchen/bedroom) to "living" if adjacent.
-        *   Connects rooms via "door" or "window" geometries.
-    *   **Returns**: A new `Graph` object.
-
-### `ResPlan.Library.PlanRenderer`
-
-Visualizes plans using SkiaSharp.
-
-*   `static void Render(Plan plan, string outputPath, int width = 800, int height = 800)`
-    *   Renders a single `Plan`.
-
-## Testing
-
-Tests are located in `ResPlan.Tests` and use xUnit.
-
-To run tests:
-```bash
-dotnet test ResPlan.Tests
-```
-
-**Note**: The tests use a truncated sample dataset (`sample.pkl`) to verify the loading pipeline without downloading the full dataset.
+Native pickle decoding runs on a worker thread so awaiting the loader does not block a UI thread. Logger callbacks may execute on that worker thread; UI callers should dispatch updates through their UI framework or an `IProgress<string>` implementation.
